@@ -1,7 +1,7 @@
 /**
- * 광장 철수 vs 영희 겜블 — 1시간마다 승부, 골드 배팅
+ * 광장 철수 vs 영희 겜블 — 30분마다 승부, 골드 배팅
  */
-const ROUND_INTERVAL_MS = 2 * 60 * 1000; // 2분 (테스트용, 운영시 60*60*1000)
+const ROUND_INTERVAL_MS = 30 * 60 * 1000; // 30분
 const CHOICES = ['철수승', '영희승', '무승부'];
 const ODDS = { 철수승: 2, 영희승: 2, 무승부: 6 };
 const MIN_BET = 30;

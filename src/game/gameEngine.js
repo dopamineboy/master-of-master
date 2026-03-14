@@ -246,8 +246,11 @@ function normalizeId(val) {
   return s.normalize ? s.normalize('NFC') : s;
 }
 
+const ADMIN_ID = 'admin';
+
 function checkIdAvailable(accountId) {
   const id = normalizeId(accountId);
+  if (id === ADMIN_ID) return { ok: false, reason: '해당 아이디는 사용할 수 없습니다.' };
   if (!isValidAccountId(id)) return { ok: false, reason: '아이디는 2~12자(한글·영문·숫자)로 입력하세요.' };
   return { ok: !users.has(id), reason: users.has(id) ? '이미 사용 중인 아이디입니다.' : null };
 }
@@ -256,6 +259,7 @@ function createAccount(accountId, password) {
   const id = normalizeId(accountId);
   let pw = String(password || '').trim();
   if (pw.normalize) pw = pw.normalize('NFC');
+  if (id === ADMIN_ID) return { ok: false, replyText: '해당 아이디는 사용할 수 없습니다.' };
   if (!isValidAccountId(id)) return { ok: false, replyText: '아이디는 2~12자(한글·영문·숫자)로 입력하세요.' };
   if (users.has(id)) return { ok: false, replyText: '이미 사용 중인 아이디입니다.' };
   if (!isValidPassword(pw)) return { ok: false, replyText: '비밀번호는 8자 이내(한글·영문·숫자)로 입력하세요.' };
@@ -1794,5 +1798,39 @@ function getNickname(userId) {
   const user = users.get(userId);
   return (user && user.characterName) ? user.characterName : '손님';
 }
+
+/** 관리자 계정 초기화 (서버 시작 시, 다른 사용자가 admin 사용 불가) */
+function initAdminAccount() {
+  const ADMIN_PW = process.env.ADMIN_PASSWORD || 'admin123';
+  if (users.has(ADMIN_ID)) return;
+  const user = {
+    id: ADMIN_ID,
+    accountId: ADMIN_ID,
+    passwordHash: hashPassword(ADMIN_PW),
+    characterName: '관리자',
+    characterType: 'farmer',
+    isAdmin: true,
+    level: 1,
+    harvestCount: 0,
+    fishCount: 0,
+    mineCount: 0,
+    jobTitleFarmer: 0,
+    jobTitleFisherman: 0,
+    jobTitleMiner: 0,
+    jobTitleMerchant: 0,
+    merchantBuyTotal: 0,
+    merchantBuyPrice: {},
+    gold: 0,
+    energy: ENERGY_MAX,
+    maxEnergy: ENERGY_MAX,
+    lastResetDate: getKSTDateString(),
+    combatPower: 1,
+    battlesToday: 0,
+    battleHistory: [],
+    inventory: {}
+  };
+  users.set(ADMIN_ID, user);
+}
+initAdminAccount();
 
 module.exports = { handleGameCommand, getState, addGoldToUser, getNickname, users, FISH, JOBS, JOB_LABELS };

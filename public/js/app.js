@@ -25,7 +25,7 @@
         '<p><strong>3. 에너지</strong><br>행동 시 에너지 2 소모. <em>매일 오전 12:00(자정)</em>에 자동 리셋.</p>' +
         '<p><strong>4. 가방</strong><br>탭별 아이템 확인, 전부 판매 가능.</p>' +
         '<p><strong>5. 장터</strong><br>일반판매 / 상인조합(농부·어부·광부 판매→장사꾼 구매) / 상인판매(장사꾼 등록·모두 구매).</p>' +
-        '<p><strong>6. 광장</strong><br>철수 vs 영희 배팅(30~100G, 1시간마다). 2배·6배 배당.</p>' +
+        '<p><strong>6. 광장</strong><br>철수 vs 영희 배팅(30~100G, 30분마다). 2배·6배 배당.</p>' +
         '<p><strong>7. 전투</strong><br>하루 3회, 먹이사슬 적용. 승/패 시 골드±10%, 무승부 에너지-10.</p>' +
         '<p><strong>8. 강화·조합</strong><br>전투능력 강화(강화석), 계약서 조합(10→1), 크로스조합(레어+일반).</p>' +
         '<p><strong>9. 팁</strong><br>에너지는 자정 리셋. 장사꾼은 상인조합→재판매. 레어·유니크는 크로스조합 재료.</p>' +
@@ -874,15 +874,11 @@
       el.innerHTML = '<p class="plaza-empty">아직 경기 결과가 없습니다.</p>';
       return;
     }
-    var html = '';
-    var icons = { '철수승': '👦', '영희승': '👧', '무승부': '🤝' };
     var labels = { '철수승': '철수 승', '영희승': '영희 승', '무승부': '무승부' };
-    history.slice(0, 10).forEach(function (r) {
-      var time = r.resolvedAt ? new Date(r.resolvedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '';
-      var winnerText = (r.winners && r.winners.length) ? r.winners.map(function (w) { return w.nickname + ' +' + w.payout + 'G'; }).join(', ') : '당첨자 없음';
-      html += '<div class="plaza-history-item"><div class="plaza-history-result">' + (icons[r.result] || '') + ' ' + (labels[r.result] || r.result) + '</div><div class="plaza-history-winners">' + winnerText + '</div><div class="plaza-history-time">' + time + '</div></div>';
-    });
-    el.innerHTML = html || '<p class="plaza-empty">아직 경기 결과가 없습니다.</p>';
+    var html = history.slice(0, 10).map(function (r) {
+      return '<div class="plaza-history-item">' + (labels[r.result] || r.result) + '</div>';
+    }).join('');
+    el.innerHTML = html;
   }
   function renderPlazaLiveBets(bets, totalByChoice) {
     var el = document.getElementById('plaza-live-bets');
