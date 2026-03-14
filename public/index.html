@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>평민 → 마스터</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 1) 캐릭터 생성 / 로그인 화면 -->
+    <section id="create-screen" class="screen active">
+      <header class="create-header">
+        <h1 class="game-title game-title-main" id="game-title-main" data-text="노가다 MASTER">노가다 MASTER</h1>
+        <button type="button" id="btn-show-login" class="btn-login-header">로그인</button>
+      </header>
+      <div class="create-center">
+        <div class="job-select job-select-disabled" aria-label="직업 (선택 불가)">
+          <span class="job-btn-disabled" data-job="farmer"><span class="job-btn-icon">🌾</span><span class="job-btn-name">농부</span></span>
+          <span class="job-btn-disabled" data-job="fisherman"><span class="job-btn-icon">🎣</span><span class="job-btn-name">낚시꾼</span></span>
+          <span class="job-btn-disabled" data-job="miner"><span class="job-btn-icon">⛏️</span><span class="job-btn-name">광부</span></span>
+          <span class="job-btn-disabled" data-job="merchant"><span class="job-btn-icon">💰</span><span class="job-btn-name">장사꾼</span></span>
+        </div>
+        <p class="job-random-hint">직업은 랜덤으로 선택됩니다.</p>
+        <div class="create-form-row">
+          <div class="input-with-btn">
+            <label for="account-id-input" class="nickname-label">아이디 (닉네임과 동일, 2~12자 한글·영문·숫자)</label>
+            <div class="input-btn-wrap">
+              <input type="text" id="account-id-input" class="nickname-input" placeholder="아이디 입력" maxlength="12" autocomplete="username">
+              <button type="button" id="btn-check-id" class="btn-check-id">중복확인</button>
+            </div>
+            <span id="check-id-result" class="check-id-result hidden"></span>
+          </div>
+        </div>
+        <div class="create-form-row">
+          <label for="password-input" class="nickname-label">비밀번호 (8자 이내, 한글·영문·숫자)</label>
+          <input type="password" id="password-input" class="nickname-input" placeholder="비밀번호 입력" maxlength="8" autocomplete="new-password">
+        </div>
+        <button type="button" id="btn-create" class="btn-create">캐릭터 생성</button>
+      </div>
+      <p id="create-error" class="create-error hidden"></p>
+
+      <!-- 로그인 모달 -->
+      <div id="login-modal" class="login-modal hidden">
+        <div class="login-modal-inner">
+          <h3 class="login-modal-title">로그인</h3>
+          <div class="login-form-row">
+            <label for="login-id-input">아이디</label>
+            <input type="text" id="login-id-input" placeholder="아이디" maxlength="12" autocomplete="username">
+          </div>
+          <div class="login-form-row">
+            <label for="login-password-input">비밀번호</label>
+            <input type="password" id="login-password-input" placeholder="비밀번호" maxlength="8" autocomplete="current-password">
+          </div>
+          <p id="login-error" class="login-error hidden"></p>
+          <div class="login-modal-btns">
+            <button type="button" id="btn-login-submit" class="btn-create">로그인</button>
+            <button type="button" id="btn-login-cancel" class="btn-cancel">취소</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2) 채널 입장 온보딩 (농부/낚시꾼/광부/장사꾼 채널) -->
+    <section id="channel-screen" class="screen channel-screen">
+      <p class="channel-message channel-message-top" id="channel-message">농부 채널에 입장하셨습니다.</p>
+      <div class="energy-gauge-wrap">
+        <span class="energy-gauge-label">에너지</span>
+        <div class="energy-gauge-bar"><div class="energy-gauge-fill" id="energy-gauge-fill"></div></div>
+        <span class="energy-gauge-text" id="energy-gauge-text">0/100</span>
+      </div>
+      <header class="channel-header">
+        <div class="channel-left">
+          <button type="button" id="btn-myinfo" class="icon-btn" title="내 정보">
+            <span class="icon-btn-emoji">👤</span>
+            <span class="icon-btn-label">내 정보</span>
+          </button>
+          <button type="button" id="btn-bag" class="icon-btn" title="가방">
+            <span class="icon-btn-emoji">🎒</span>
+            <span class="icon-btn-label">가방</span>
+          </button>
+        </div>
+        <div class="channel-actions">
+          <button type="button" id="btn-chat" class="icon-btn" title="채팅">
+            <span class="icon-btn-emoji">💬</span>
+            <span class="icon-btn-label">채팅</span>
+          </button>
+          <button type="button" id="btn-notice" class="icon-btn" title="알림/공지">
+            <span class="icon-btn-emoji">🔔</span>
+            <span class="icon-btn-label">알림/공지</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="channel-body">
+        <!-- 지도/마인드맵: 섹터 3개 -->
+        <div class="channel-map" id="channel-map">
+          <div class="map-hub">마을</div>
+          <div class="map-sectors">
+            <button type="button" class="sector-btn sector-farm" data-sector="farm">
+              <span class="sector-icon">🌾</span>
+              <span class="sector-name">밭</span>
+            </button>
+            <button type="button" class="sector-btn sector-plaza" data-sector="plaza">
+              <span class="sector-icon">🏛️</span>
+              <span class="sector-name">광장</span>
+            </button>
+            <button type="button" class="sector-btn sector-market" data-sector="market">
+              <span class="sector-icon">🏪</span>
+              <span class="sector-name">장터</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 섹터 입장 시 보이는 뷰 (밭/호수/광산/창고 등) -->
+        <div class="sector-view hidden" id="sector-view">
+          <button type="button" id="btn-back-map" class="btn-back">← 지도로 돌아가기</button>
+          <div class="sector-content" id="sector-content">
+            <p class="sector-placeholder" id="sector-placeholder">밭</p>
+            <div class="activity-zone hidden" id="activity-zone">
+              <div class="activity-anim" id="activity-anim"></div>
+              <button type="button" id="btn-activity" class="btn-activity" disabled>진행 중...</button>
+            </div>
+            <div class="plaza-zone hidden" id="plaza-zone">
+              <div class="plaza-center-wrap">
+                <div class="plaza-header-btns">
+                  <button type="button" id="btn-plaza-history" class="icon-btn plaza-panel-btn" title="지난 경기 결과">
+                    <span class="icon-btn-emoji">📜</span>
+                    <span class="icon-btn-label">경기 결과</span>
+                  </button>
+                  <button type="button" id="btn-plaza-live" class="icon-btn plaza-panel-btn" title="실시간 배팅 현황">
+                    <span class="icon-btn-emoji">📊</span>
+                    <span class="icon-btn-label">배팅 현황</span>
+                  </button>
+                </div>
+                <div class="plaza-winners-board" id="plaza-winners-board">
+                  <h3 class="plaza-winners-title">🎊 지난 경기 당첨자</h3>
+                  <div id="plaza-winners-list" class="plaza-winners-list">-</div>
+                </div>
+                <div class="plaza-bet-section">
+                  <h3 class="plaza-panel-title">👦 vs 👧 철수 vs 영희 (1시간마다 승부)</h3>
+                  <p class="plaza-desc">최소 30G ~ 최대 100G / 철수 승 2배 · 영희 승 2배 · 무승부 6배</p>
+                  <div class="plaza-bet-choices">
+                    <button type="button" class="plaza-choice-btn" data-choice="철수승">👦 철수 승 (2배)</button>
+                    <button type="button" class="plaza-choice-btn" data-choice="영희승">👧 영희 승 (2배)</button>
+                    <button type="button" class="plaza-choice-btn" data-choice="무승부">🤝 무승부 (6배)</button>
+                  </div>
+                  <div class="plaza-bet-form">
+                    <label>배팅 금액 (30~100 G)</label>
+                    <input type="number" id="plaza-bet-amount" class="plaza-bet-input" min="30" max="100" value="30">
+                    <button type="button" id="plaza-bet-btn" class="btn-plaza-bet">배팅</button>
+                  </div>
+                  <p id="plaza-bet-result" class="plaza-result hidden"></p>
+                  <div id="plaza-countdown-wrap" class="plaza-countdown-wrap">
+                    <p id="plaza-countdown" class="plaza-countdown"></p>
+                    <div id="plaza-countdown-num" class="plaza-countdown-num hidden" aria-live="polite"></div>
+                  </div>
+                  <div id="plaza-result-overlay" class="plaza-result-overlay hidden" aria-live="polite">
+                    <div class="plaza-showdown">
+                      <span class="plaza-vs-left">👦 철수</span>
+                      <span class="plaza-vs-vs">VS</span>
+                      <span class="plaza-vs-right">👧 영희</span>
+                    </div>
+                    <div id="plaza-result-text" class="plaza-result-text"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="market-zone hidden" id="market-zone">
+              <div class="market-tabs">
+                <button type="button" class="market-tab active" data-tab="general">일반판매</button>
+                <button type="button" class="market-tab" data-tab="guild">상인조합</button>
+                <button type="button" class="market-tab" data-tab="merchant">상인판매</button>
+              </div>
+              <!-- 일반판매: 로또/나락상자, 계약서 -->
+              <div id="market-general" class="market-section active">
+                <p class="market-desc">NPC 상점. 로또상자·나락상자·계약서를 구매할 수 있습니다.</p>
+                <div class="market-buy-row">
+                  <span class="market-item-name">로또상자 (10G) <span id="lotto-remaining" class="market-remaining"></span></span>
+                  <button type="button" class="btn-market btn-buy-box" data-box="lotto_box">구매</button>
+                </div>
+                <div class="market-buy-row">
+                  <span class="market-item-name">나락상자 (100G) <span id="narak-remaining" class="market-remaining"></span></span>
+                  <button type="button" class="btn-market btn-buy-box" data-box="narak_box">구매</button>
+                </div>
+                <div class="market-buy-row">
+                  <span class="market-item-name">일반계약서 1장 (1,000G)</span>
+                  <button type="button" class="btn-market" data-count="1">1장 구매</button>
+                </div>
+                <p class="market-craft-hint">가방에서 일반계약서 10장을 조합하면 고급계약서 1장을 만들 수 있습니다.</p>
+              </div>
+              <!-- 상인조합: 농부/어부/광부 판매, 장사꾼만 구매 -->
+              <div id="market-guild" class="market-section">
+                <p class="market-desc market-desc-guild">농부·어부·광부: 드랍 아이템을 판매. 장사꾼: 구매만 가능.</p>
+                <div id="guild-sell-area" class="market-area">
+                  <h4 class="market-area-title">내 아이템 판매 (농부/어부/광부)</h4>
+                  <div id="guild-sell-list" class="market-item-list"></div>
+                </div>
+                <div id="guild-buy-area" class="market-area">
+                  <h4 class="market-area-title">상인조합 풀 (장사꾼 구매)</h4>
+                  <div id="guild-pool-list" class="market-item-list"></div>
+                </div>
+              </div>
+              <!-- 상인판매: 장사꾼 등록, 모두 구매 -->
+              <div id="market-merchant" class="market-section">
+                <p class="market-desc market-desc-merchant">장사꾼: 상인조합에서 구매한 아이템을 이윤 범위 내에서 등록. 모두 구매 가능.</p>
+                <div id="merchant-list-area" class="market-area">
+                  <h4 class="market-area-title">내 판매 등록 (장사꾼)</h4>
+                  <div id="merchant-list-register" class="market-register-list"></div>
+                </div>
+                <div id="merchant-buy-area" class="market-area">
+                  <h4 class="market-area-title">상인들의 판매 물품</h4>
+                  <div id="merchant-listings-list" class="market-item-list"></div>
+                </div>
+              </div>
+              <p class="market-result hidden" id="market-result"></p>
+            </div>
+            <div class="activity-result hidden" id="activity-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 전투 결과/버튼 (채널 하단 가운데) -->
+      <div class="battle-section" id="battle-section">
+        <div class="battle-header">
+          <button type="button" id="btn-battle" class="btn-battle">⚔️ 전투</button>
+          <span class="battle-remaining" id="battle-remaining">3/3</span>
+        </div>
+        <div class="battle-result-list" id="battle-result-list">
+          <p class="battle-empty" id="battle-empty">전투 이력이 없습니다.</p>
+        </div>
+      </div>
+      <!-- 전투 결과 오버레이 (승/패/무) -->
+      <div id="battle-result-overlay" class="battle-result-overlay hidden" aria-live="polite">
+        <div class="battle-showdown">
+          <span class="battle-vs-left">나</span>
+          <span class="battle-vs-vs">VS</span>
+          <span id="battle-opponent-name" class="battle-vs-right">???</span>
+        </div>
+        <div id="battle-result-text" class="battle-result-text"></div>
+        <div id="battle-result-detail" class="battle-result-detail"></div>
+      </div>
+
+      <!-- 채팅 패널 (오른쪽 슬라이드) -->
+      <aside id="panel-chat" class="panel panel-chat">
+        <div class="panel-chat-inner">
+          <div class="panel-header">
+            <h2>채팅</h2>
+            <button type="button" class="panel-close" data-close="panel-chat" aria-label="닫기">×</button>
+          </div>
+          <ul class="chat-messages" id="chat-messages"></ul>
+          <div class="chat-input-wrap">
+            <input type="text" id="chat-input" class="chat-input" placeholder="메시지 입력" maxlength="200" autocomplete="off">
+            <button type="button" id="chat-send" class="chat-send">전송</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 알림/공지 패널 -->
+      <!-- 왼쪽 패널: 내 정보 -->
+      <aside id="panel-myinfo" class="panel panel-left">
+        <div class="panel-inner-left">
+          <div class="panel-header">
+            <h2>내 정보</h2>
+            <button type="button" class="panel-close" data-close="panel-myinfo" aria-label="닫기">×</button>
+          </div>
+          <div class="myinfo-body">
+            <div class="myinfo-row"><span class="myinfo-label">아이디</span><span id="myinfo-account" class="myinfo-value">-</span></div>
+            <div class="myinfo-row"><span class="myinfo-label">전투능력</span><span id="myinfo-combat" class="myinfo-value">1</span></div>
+            <div class="myinfo-row"><span class="myinfo-label">칭호</span><span id="myinfo-title" class="myinfo-value">평민</span></div>
+            <div class="myinfo-row"><span class="myinfo-label">보유 골드</span><span id="myinfo-gold" class="myinfo-value">0</span> G</div>
+            <div id="myinfo-activity-row" class="myinfo-row myinfo-activity-row hidden"><span class="myinfo-label">활동 횟수</span><span id="myinfo-activity" class="myinfo-value"></span></div>
+            <div id="myinfo-next-title-row" class="myinfo-row myinfo-next-title-row hidden"><span class="myinfo-label">다음 칭호</span><div id="myinfo-next-title" class="myinfo-next-title"></div></div>
+          </div>
+        </div>
+      </aside>
+      <!-- 왼쪽 패널: 가방 -->
+      <aside id="panel-bag" class="panel panel-left">
+        <div class="panel-inner-left">
+          <div class="panel-header">
+            <h2>가방</h2>
+            <button type="button" class="panel-close" data-close="panel-bag" aria-label="닫기">×</button>
+          </div>
+          <div id="bag-content" class="bag-content"></div>
+        </div>
+      </aside>
+      <!-- 왼쪽 패널: 광장 경기 결과 (광장 입장 시 표시) -->
+      <aside id="panel-plaza-history" class="panel panel-left plaza-panel">
+        <div class="panel-inner-left">
+          <div class="panel-header">
+            <h2>📜 지난 경기 결과</h2>
+            <button type="button" class="panel-close" data-close="panel-plaza-history" aria-label="닫기">×</button>
+          </div>
+          <div id="plaza-history" class="plaza-history-panel-content"></div>
+        </div>
+      </aside>
+      <!-- 오른쪽 패널: 광장 실시간 배팅 현황 -->
+      <aside id="panel-plaza-live" class="panel panel-chat plaza-panel">
+        <div class="panel-chat-inner">
+          <div class="panel-header">
+            <h2>📊 실시간 배팅 현황</h2>
+            <button type="button" class="panel-close" data-close="panel-plaza-live" aria-label="닫기">×</button>
+          </div>
+          <div id="plaza-live-bets" class="plaza-live-panel-content"></div>
+        </div>
+      </aside>
+      <div id="panel-backdrop" class="panel-backdrop hidden" aria-hidden="true"></div>
+      <!-- 최초 채널 입장 축하 오버레이 -->
+      <div id="welcome-overlay" class="welcome-overlay hidden" aria-live="polite">
+        <div class="welcome-celebration">
+          <div id="welcome-title" class="welcome-title">축하합니다!</div>
+          <div id="welcome-icon" class="welcome-icon">🎉</div>
+          <div id="welcome-sub" class="welcome-sub"></div>
+        </div>
+      </div>
+      <!-- 전투 결과 오버레이 -->
+      <div id="battle-result-overlay" class="battle-result-overlay hidden" aria-live="polite">
+        <div class="battle-result-inner">
+          <div class="battle-vs-wrap">
+            <span class="battle-vs-me">나</span>
+            <span class="battle-vs-vs">⚔️ VS</span>
+            <span class="battle-vs-opp" id="battle-opponent-name">???</span>
+          </div>
+          <div id="battle-result-text" class="battle-result-text"></div>
+          <div id="battle-result-detail" class="battle-result-detail"></div>
+        </div>
+      </div>
+      <!-- 로또상자 오픈 결과 모달 -->
+      <div id="lotto-result-overlay" class="lotto-result-overlay hidden" aria-live="polite">
+        <div class="lotto-box-open">
+          <div class="lotto-box-icon">📦</div>
+          <div class="lotto-sparkle lotto-sparkle-1"></div>
+          <div class="lotto-sparkle lotto-sparkle-2"></div>
+          <div class="lotto-sparkle lotto-sparkle-3"></div>
+          <div id="lotto-result-text" class="lotto-result-text"></div>
+          <div id="lotto-result-item" class="lotto-result-item"></div>
+        </div>
+      </div>
+      <aside id="panel-notice" class="panel panel-notice">
+        <div class="panel-notice-inner">
+          <div class="panel-header">
+            <h2>알림 / 공지</h2>
+            <button type="button" class="panel-close" data-close="panel-notice" aria-label="닫기">×</button>
+          </div>
+          <ul class="notice-list" id="notice-list"></ul>
+        </div>
+      </aside>
+    </section>
+  </div>
+  <script src="js/app.js"></script>
+</body>
+</html>

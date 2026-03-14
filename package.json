@@ -1,0 +1,19 @@
+{
+  "name": "growth-game-web",
+  "version": "0.1.0",
+  "description": "평민 → 왕 2D 육성 게임 (웹)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "keywords": [
+    "game",
+    "web",
+    "2d"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  }
+}
