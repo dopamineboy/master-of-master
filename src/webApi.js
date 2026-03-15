@@ -53,7 +53,8 @@ function apiCommand(req, res, body, onAfter) {
     battle: result.battle || null,
     enhanceCombat: result.enhanceCombat || null,
     useSuperFood: result.useSuperFood || null,
-    craftCross: result.craftCross || null
+    craftCross: result.craftCross || null,
+    adminResult: result.adminResult || null
   };
   if (typeof onAfter === 'function') onAfter(result);
   res.end(JSON.stringify(payload));
@@ -66,6 +67,13 @@ function apiGetState(req, res) {
   res.end(JSON.stringify({ state }));
 }
 
+function apiLogout(req, res) {
+  const newSid = `s_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${newSid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify({ logout: true }));
+}
+
 function apiPlazaRound(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   const current = plazaGamble.getCurrentRound(getNickname || null);
@@ -74,4 +82,4 @@ function apiPlazaRound(req, res) {
   res.end(JSON.stringify({ currentRound: current, history, config }));
 }
 
-module.exports = { apiCommand, apiGetState, apiPlazaRound };
+module.exports = { apiCommand, apiGetState, apiPlazaRound, apiLogout };

@@ -593,7 +593,8 @@ function buildState(user) {
     inventory: { ...user.inventory },
     inventoryList: list,
     guildPoolList,
-    merchantListingsList
+    merchantListingsList,
+    isAdmin: !!(user.isAdmin)
   };
 }
 
@@ -623,6 +624,62 @@ function handleGameCommand(userId, body) {
 
   const user = getOrCreateUser(userId);
   if (!user) return { replyText: '로그인이 필요합니다.', state: null };
+
+  // ---------- 관리자 전용 명령어 (admin만 사용 가능) ----------
+  const isAdmin = user.isAdmin === true || userId === ADMIN_ID;
+  if (isAdmin && action) {
+    const targetId = normalizeId(body.targetAccountId || body.targetId || '');
+    const target = targetId && users.has(targetId) ? getOrCreateUser(targetId) : null;
+
+    if (action === 'adminChangeJob') {
+      if (!target) return { replyText: '대상 계정을 찾을 수 없습니다.', state: buildState(user) };
+      const newJob = String(body.newJob || '').trim();
+      if (!JOBS.includes(newJob)) return { replyText: `직업은 ${JOBS.join(', ')} 중 하나여야 합니다.`, state: buildState(user) };
+      target.characterType = newJob;
+      return { replyText: `${target.accountId || target.id}의 직업을 ${JOB_LABELS[newJob]}으로 변경했습니다.`, state: buildState(user), adminResult: { type: 'changeJob', targetId: target.id, newJob } };
+    }
+    if (action === 'adminSetGold') {
+      if (!target) return { replyText: '대상 계정을 찾을 수 없습니다.', state: buildState(user) };
+      const gold = parseInt(body.gold, 10);
+      if (isNaN(gold) || gold < 0) return { replyText: '골드는 0 이상의 숫자여야 합니다.', state: buildState(user) };
+      target.gold = gold;
+      return { replyText: `${target.accountId || target.id}의 골드를 ${gold}G로 설정했습니다.`, state: buildState(user), adminResult: { type: 'setGold', targetId: target.id, gold } };
+    }
+    if (action === 'adminAddItem') {
+      if (!target) return { replyText: '대상 계정을 찾을 수 없습니다.', state: buildState(user) };
+      const itemId = String(body.itemId || '').trim();
+      const count = parseInt(body.count, 10) || 1;
+      if (!itemId || !ITEMS[itemId]) return { replyText: '유효한 itemId를 입력하세요. (예: contract_1, fish_1, crop_rare1, enhancement_stone 등)', state: buildState(user) };
+      if (count < 1) return { replyText: '추가 개수는 1 이상이어야 합니다.', state: buildState(user) };
+      addToInv(target.inventory, itemId, count);
+      const it = ITEMS[itemId];
+      return { replyText: `${target.accountId || target.id}에게 ${it.name} ${count}개를 추가했습니다.`, state: buildState(user), adminResult: { type: 'addItem', targetId: target.id, itemId, count } };
+    }
+    if (action === 'adminSetItem') {
+      if (!target) return { replyText: '대상 계정을 찾을 수 없습니다.', state: buildState(user) };
+      const itemId = String(body.itemId || '').trim();
+      const count = parseInt(body.count, 10);
+      if (!itemId || !ITEMS[itemId]) return { replyText: '유효한 itemId를 입력하세요.', state: buildState(user) };
+      if (isNaN(count) || count < 0) return { replyText: '개수는 0 이상이어야 합니다.', state: buildState(user) };
+      if (count === 0) {
+        delete target.inventory[itemId];
+      } else {
+        target.inventory[itemId] = count;
+      }
+      const it = ITEMS[itemId];
+      return { replyText: `${target.accountId || target.id}의 ${it.name}을(를) ${count}개로 설정했습니다.`, state: buildState(user), adminResult: { type: 'setItem', targetId: target.id, itemId, count } };
+    }
+    if (action === 'adminListUsers') {
+      const userList = Array.from(users.keys()).filter(id => id !== ADMIN_ID).slice(0, 50);
+      const listStr = userList.join(', ');
+      return { replyText: `등록된 계정 (최대 50명): ${listStr || '(없음)'}`, state: buildState(user), adminResult: { type: 'listUsers', users: userList } };
+    }
+    if (action === 'adminGetItems') {
+      const items = Object.entries(ITEMS).map(([id, it]) => ({ id, name: it.name, job: it.job || '' }));
+      return { replyText: '', state: buildState(user), adminResult: { type: 'getItems', items } };
+    }
+  }
+
   ensureDailyEnergy(user);
   const t = (isObject ? body.text : body) != null ? String(isObject ? body.text : body).trim().replace(/^\//, '') : '';
   const cmd = (t || (isObject && body.action != null ? String(body.action) : '')).trim();

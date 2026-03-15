@@ -2,7 +2,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const WebSocket = require('ws');
-const { apiCommand, apiGetState, apiPlazaRound } = require('./webApi');
+const { apiCommand, apiGetState, apiPlazaRound, apiLogout } = require('./webApi');
 const { attachChat } = require('./chatServer');
 const plazaGamble = require('./game/plazaGamble');
 const { addGoldToUser, getNickname } = require('./game/gameEngine');
@@ -32,6 +32,10 @@ function serveStatic(req, res, filePath) {
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && (req.url === '/api/state' || req.url === '/api/state/')) {
     apiGetState(req, res);
+    return;
+  }
+  if (req.method === 'GET' && (req.url === '/api/logout' || req.url === '/api/logout/')) {
+    apiLogout(req, res);
     return;
   }
   if (req.method === 'GET' && (req.url === '/api/plaza/round' || req.url === '/api/plaza/round/')) {

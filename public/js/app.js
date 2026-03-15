@@ -74,6 +74,7 @@
   const panelBackdrop = document.getElementById('panel-backdrop');
   const btnMyinfo = document.getElementById('btn-myinfo');
   const btnBag = document.getElementById('btn-bag');
+  const btnLogout = document.getElementById('btn-logout');
   const panelMyinfo = document.getElementById('panel-myinfo');
   const panelBag = document.getElementById('panel-bag');
   const myinfoCombat = document.getElementById('myinfo-combat');
@@ -166,8 +167,15 @@
         channelState = data.state;
         updateEnergyGauge(channelState);
         updateBattleUI(channelState);
+        updateAdminVisibility();
       }
     });
+  }
+  function updateAdminVisibility() {
+    var btnAdmin = document.getElementById('btn-admin');
+    if (btnAdmin) {
+      btnAdmin.classList.toggle('hidden', !(channelState && channelState.isAdmin));
+    }
   }
 
   function updateBattleUI(s) {
@@ -461,11 +469,13 @@
   }
   var panelPlazaHistory = document.getElementById('panel-plaza-history');
   var panelPlazaLive = document.getElementById('panel-plaza-live');
+  var panelAdmin = document.getElementById('panel-admin');
   function closePanel(panel) {
     if (panel) panel.classList.remove('open');
     var phOpen = panelPlazaHistory && panelPlazaHistory.classList.contains('open');
     var plOpen = panelPlazaLive && panelPlazaLive.classList.contains('open');
-    if (panelBackdrop && !panelChat.classList.contains('open') && !panelNotice.classList.contains('open') && !panelMyinfo.classList.contains('open') && !panelBag.classList.contains('open') && !phOpen && !plOpen) {
+    var paOpen = panelAdmin && panelAdmin.classList.contains('open');
+    if (panelBackdrop && !panelChat.classList.contains('open') && !panelNotice.classList.contains('open') && !panelMyinfo.classList.contains('open') && !panelBag.classList.contains('open') && !phOpen && !plOpen && !paOpen) {
       panelBackdrop.classList.add('hidden');
       panelBackdrop.setAttribute('aria-hidden', 'true');
     }
@@ -477,6 +487,7 @@
     if (panelBag) panelBag.classList.remove('open');
     if (panelPlazaHistory) panelPlazaHistory.classList.remove('open');
     if (panelPlazaLive) panelPlazaLive.classList.remove('open');
+    if (panelAdmin) panelAdmin.classList.remove('open');
     if (panelBackdrop) {
       panelBackdrop.classList.add('hidden');
       panelBackdrop.setAttribute('aria-hidden', 'true');
@@ -560,6 +571,128 @@
         });
     });
   }
+
+  function doLogout() {
+    if (!channelScreen.classList.contains('active')) return;
+    api('GET', '/api/logout').then(function (res) {
+      if (res.logout) {
+        closeAllPanels();
+        if (chatWs && chatWs.readyState === 1) chatWs.close();
+        chatWs = null;
+        chatLog = [];
+        channelState = null;
+        channelScreen.classList.remove('active');
+        createScreen.classList.add('active');
+      }
+    }).catch(function () {});
+  }
+  if (btnLogout) btnLogout.addEventListener('click', doLogout);
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+      e.preventDefault();
+      doLogout();
+    }
+  });
+
+  function loadAdminUsers(cb) {
+    api('POST', '/api/command', { action: 'adminListUsers' }).then(function (res) {
+      var users = (res.adminResult && res.adminResult.users) || [];
+      var sel = document.getElementById('admin-target');
+      if (sel) {
+        var cur = sel.value;
+        sel.innerHTML = '<option value="">— 선택 —</option>' + users.map(function (u) { return '<option value="' + u + '">' + u + '</option>'; }).join('');
+        if (users.indexOf(cur) >= 0) sel.value = cur;
+      }
+      if (cb) cb();
+    });
+  }
+  function loadAdminItems(cb) {
+    api('POST', '/api/command', { action: 'adminGetItems' }).then(function (res) {
+      var items = (res.adminResult && res.adminResult.items) || [];
+      var opt = '<option value="">— 선택 —</option>' + items.map(function (it) { return '<option value="' + it.id + '">' + it.name + ' (' + it.id + ')</option>'; }).join('');
+      var addSel = document.getElementById('admin-item-add');
+      var setSel = document.getElementById('admin-item-set');
+      if (addSel) addSel.innerHTML = opt;
+      if (setSel) setSel.innerHTML = opt;
+      if (cb) cb();
+    });
+  }
+  function openAdminPanel() {
+    loadAdminUsers(function () { loadAdminItems(function () { openPanel(panelAdmin); }); });
+  }
+  function showAdminResult(msg, isErr) {
+    var el = document.getElementById('admin-result');
+    if (el) { el.textContent = msg || ''; el.className = 'admin-result' + (isErr ? ' admin-result-err' : ''); }
+  }
+  var btnAdmin = document.getElementById('btn-admin');
+  if (btnAdmin) btnAdmin.addEventListener('click', openAdminPanel);
+  var adminRefreshBtn = document.getElementById('admin-refresh-users');
+  if (adminRefreshBtn) adminRefreshBtn.addEventListener('click', loadAdminUsers);
+  var adminChangeJobBtn = document.getElementById('admin-btn-change-job');
+  if (adminChangeJobBtn) adminChangeJobBtn.addEventListener('click', function () {
+    var target = document.getElementById('admin-target');
+    var jobSel = document.getElementById('admin-job');
+    if (!target || !target.value) { showAdminResult('대상 계정을 선택하세요.', true); return; }
+    adminChangeJobBtn.disabled = true;
+    api('POST', '/api/command', { action: 'adminChangeJob', targetAccountId: target.value, newJob: jobSel ? jobSel.value : 'farmer' })
+      .then(function (res) {
+        adminChangeJobBtn.disabled = false;
+        showAdminResult(res.replyText || '완료');
+        if (res.state) { channelState = res.state; updateEnergyGauge(channelState); }
+      })
+      .catch(function () { adminChangeJobBtn.disabled = false; showAdminResult('오류 발생', true); });
+  });
+  var adminSetGoldBtn = document.getElementById('admin-btn-set-gold');
+  if (adminSetGoldBtn) adminSetGoldBtn.addEventListener('click', function () {
+    var target = document.getElementById('admin-target');
+    var goldInp = document.getElementById('admin-gold');
+    var gold = goldInp ? parseInt(goldInp.value, 10) : 0;
+    if (!target || !target.value) { showAdminResult('대상 계정을 선택하세요.', true); return; }
+    if (isNaN(gold) || gold < 0) { showAdminResult('골드는 0 이상이어야 합니다.', true); return; }
+    adminSetGoldBtn.disabled = true;
+    api('POST', '/api/command', { action: 'adminSetGold', targetAccountId: target.value, gold: gold })
+      .then(function (res) {
+        adminSetGoldBtn.disabled = false;
+        showAdminResult(res.replyText || '완료');
+        if (res.state) { channelState = res.state; updateEnergyGauge(channelState); }
+      })
+      .catch(function () { adminSetGoldBtn.disabled = false; showAdminResult('오류 발생', true); });
+  });
+  var adminAddItemBtn = document.getElementById('admin-btn-add-item');
+  if (adminAddItemBtn) adminAddItemBtn.addEventListener('click', function () {
+    var target = document.getElementById('admin-target');
+    var itemSel = document.getElementById('admin-item-add');
+    var countInp = document.getElementById('admin-item-add-count');
+    var count = countInp ? parseInt(countInp.value, 10) || 1 : 1;
+    if (!target || !target.value) { showAdminResult('대상 계정을 선택하세요.', true); return; }
+    if (!itemSel || !itemSel.value) { showAdminResult('아이템을 선택하세요.', true); return; }
+    adminAddItemBtn.disabled = true;
+    api('POST', '/api/command', { action: 'adminAddItem', targetAccountId: target.value, itemId: itemSel.value, count: count })
+      .then(function (res) {
+        adminAddItemBtn.disabled = false;
+        showAdminResult(res.replyText || '완료');
+        if (res.state) { channelState = res.state; }
+      })
+      .catch(function () { adminAddItemBtn.disabled = false; showAdminResult('오류 발생', true); });
+  });
+  var adminSetItemBtn = document.getElementById('admin-btn-set-item');
+  if (adminSetItemBtn) adminSetItemBtn.addEventListener('click', function () {
+    var target = document.getElementById('admin-target');
+    var itemSel = document.getElementById('admin-item-set');
+    var countInp = document.getElementById('admin-item-set-count');
+    var count = countInp ? parseInt(countInp.value, 10) : 0;
+    if (!target || !target.value) { showAdminResult('대상 계정을 선택하세요.', true); return; }
+    if (!itemSel || !itemSel.value) { showAdminResult('아이템을 선택하세요.', true); return; }
+    if (isNaN(count) || count < 0) { showAdminResult('개수는 0 이상이어야 합니다.', true); return; }
+    adminSetItemBtn.disabled = true;
+    api('POST', '/api/command', { action: 'adminSetItem', targetAccountId: target.value, itemId: itemSel.value, count: count })
+      .then(function (res) {
+        adminSetItemBtn.disabled = false;
+        showAdminResult(res.replyText || '완료');
+        if (res.state) { channelState = res.state; }
+      })
+      .catch(function () { adminSetItemBtn.disabled = false; showAdminResult('오류 발생', true); });
+  });
 
   btnCreate.addEventListener('click', function () {
     var accountId = (accountIdInput && accountIdInput.value || '').trim();
@@ -686,6 +819,27 @@
   }
   btnChat.addEventListener('click', function () { openPanel(panelChat); });
   btnNotice.addEventListener('click', function () { openPanel(panelNotice); });
+
+  function doLogout() {
+    if (!channelScreen || !channelScreen.classList.contains('active')) return;
+    api('GET', '/api/logout').then(function (data) {
+      if (data && data.logout) {
+        if (chatWs) { chatWs.close(); chatWs = null; }
+        closeAllPanels();
+        channelScreen.classList.remove('active');
+        createScreen.classList.add('active');
+        channelState = null;
+        chatLog = [];
+      }
+    });
+  }
+  if (btnLogout) btnLogout.addEventListener('click', doLogout);
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+      e.preventDefault();
+      doLogout();
+    }
+  });
   document.querySelectorAll('.panel-close').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var id = btn.getAttribute('data-close');

@@ -84,6 +84,10 @@
           </button>
         </div>
         <div class="channel-actions">
+          <button type="button" id="btn-admin" class="icon-btn admin-only hidden" title="관리자">
+            <span class="icon-btn-emoji">⚙️</span>
+            <span class="icon-btn-label">관리자</span>
+          </button>
           <button type="button" id="btn-chat" class="icon-btn" title="채팅">
             <span class="icon-btn-emoji">💬</span>
             <span class="icon-btn-label">채팅</span>
@@ -233,6 +237,13 @@
           <p class="battle-empty" id="battle-empty">전투 이력이 없습니다.</p>
         </div>
       </div>
+      <!-- 로그아웃 (맨 하단 가운데) -->
+      <div class="channel-logout-wrap">
+        <button type="button" id="btn-logout" class="icon-btn btn-logout-bottom" title="로그아웃 (Ctrl+Shift+L)">
+          <span class="icon-btn-emoji">🚪</span>
+          <span class="icon-btn-label">로그아웃</span>
+        </button>
+      </div>
       <!-- 전투 결과 오버레이 (승/패/무) -->
       <div id="battle-result-overlay" class="battle-result-overlay hidden" aria-live="polite">
         <div class="battle-showdown">
@@ -339,6 +350,67 @@
           <div id="lotto-result-item" class="lotto-result-item"></div>
         </div>
       </div>
+      <!-- 관리자 패널 (admin 로그인 시에만 표시) -->
+      <aside id="panel-admin" class="panel panel-left admin-panel">
+        <div class="panel-inner-left">
+          <div class="panel-header">
+            <h2>⚙️ 관리자</h2>
+            <button type="button" class="panel-close" data-close="panel-admin" aria-label="닫기">×</button>
+          </div>
+          <div class="admin-body">
+            <div class="admin-row">
+              <label for="admin-target">대상 계정</label>
+              <div class="admin-input-row">
+                <select id="admin-target" class="admin-select">
+                  <option value="">— 선택 —</option>
+                </select>
+                <button type="button" id="admin-refresh-users" class="btn-admin-refresh">새로고침</button>
+              </div>
+            </div>
+            <div class="admin-section">
+              <h4>직업 변경</h4>
+              <div class="admin-input-row">
+                <select id="admin-job" class="admin-select">
+                  <option value="farmer">농부</option>
+                  <option value="fisherman">낚시꾼</option>
+                  <option value="miner">광부</option>
+                  <option value="merchant">장사꾼</option>
+                </select>
+                <button type="button" id="admin-btn-change-job" class="btn-admin-action">변경</button>
+              </div>
+            </div>
+            <div class="admin-section">
+              <h4>골드 설정</h4>
+              <div class="admin-input-row">
+                <input type="number" id="admin-gold" class="admin-input" min="0" value="0" placeholder="골드">
+                <button type="button" id="admin-btn-set-gold" class="btn-admin-action">설정</button>
+              </div>
+            </div>
+            <div class="admin-section">
+              <h4>아이템 추가</h4>
+              <div class="admin-input-row">
+                <select id="admin-item-add" class="admin-select">
+                  <option value="">— 선택 —</option>
+                </select>
+                <input type="number" id="admin-item-add-count" class="admin-input admin-input-num" min="1" value="1">
+                <button type="button" id="admin-btn-add-item" class="btn-admin-action">추가</button>
+              </div>
+            </div>
+            <div class="admin-section">
+              <h4>아이템 개수 설정</h4>
+              <div class="admin-input-row">
+                <select id="admin-item-set" class="admin-select">
+                  <option value="">— 선택 —</option>
+                </select>
+                <input type="number" id="admin-item-set-count" class="admin-input admin-input-num" min="0" value="0">
+                <button type="button" id="admin-btn-set-item" class="btn-admin-action">설정</button>
+              </div>
+              <p class="admin-hint">0 입력 시 해당 아이템 제거</p>
+            </div>
+            <p id="admin-result" class="admin-result"></p>
+          </div>
+        </div>
+      </aside>
       <aside id="panel-notice" class="panel panel-notice">
         <div class="panel-notice-inner">
           <div class="panel-header">

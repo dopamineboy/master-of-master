@@ -1268,12 +1268,24 @@ body {
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* 로그아웃 푸터 (채널 맨 하단 가운데) */
+.channel-logout-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 20px 0;
+  flex-shrink: 0;
+}
+.channel-logout-wrap .icon-btn {
+  min-width: 120px;
+}
+
 /* 전투 섹션 (채널 하단 가운데) */
 .battle-section {
   width: 100%;
   max-width: 400px;
   margin-top: auto;
-  padding: 16px 0 24px 0;
+  padding: 16px 0 12px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2228,3 +2240,39 @@ body {
 }
 .btn-craft:hover:not(:disabled) { transform: scale(1.05); }
 .btn-craft:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 관리자 패널 */
+.admin-panel .admin-body { padding: 16px; }
+.admin-panel .admin-row { margin-bottom: 14px; }
+.admin-panel .admin-row label { display: block; margin-bottom: 6px; font-size: 0.9rem; color: var(--text); }
+.admin-panel .admin-input-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.admin-panel .admin-section { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--text-dim); }
+.admin-panel .admin-section h4 { margin: 0 0 10px 0; font-size: 0.95rem; color: var(--text); }
+.admin-panel .admin-select { flex: 1; min-width: 120px; padding: 8px 12px; background: var(--card); border: 2px solid var(--text-dim); border-radius: var(--radius); color: var(--text); font-size: 0.9rem; }
+.admin-panel .admin-input { width: 80px; padding: 8px 12px; background: var(--card); border: 2px solid var(--text-dim); border-radius: var(--radius); color: var(--text); font-size: 0.9rem; }
+.admin-panel .admin-input-num { width: 60px; }
+.admin-panel .btn-admin-action { padding: 8px 16px; background: var(--accent-fisher); border: none; border-radius: var(--radius); color: #1a1b26; font-family: var(--font-title); font-size: 0.9rem; cursor: pointer; transition: transform 0.15s; }
+.admin-panel .btn-admin-action:hover:not(:disabled) { transform: scale(1.05); }
+.admin-panel .btn-admin-action:disabled { opacity: 0.6; cursor: not-allowed; }
+.admin-panel .btn-admin-refresh { padding: 6px 12px; background: var(--bg-soft); border: 1px solid var(--text-dim); border-radius: 8px; color: var(--text); font-size: 0.85rem; cursor: pointer; }
+.admin-panel .admin-hint { margin: 6px 0 0 0; font-size: 0.8rem; color: var(--text-dim); }
+.admin-panel .admin-result { margin-top: 16px; padding: 10px; background: var(--bg-soft); border-radius: 8px; font-size: 0.9rem; min-height: 2em; }
+.admin-panel .admin-result.admin-result-err { color: #f7768e; }
+
+/* 관리자 패널 */
+.admin-panel .admin-body { padding: 12px 0; }
+.admin-row { margin-bottom: 12px; }
+.admin-row label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 4px; }
+.admin-input-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.admin-select { flex: 1; min-width: 120px; padding: 8px 10px; border: 2px solid var(--text-dim); border-radius: var(--radius); background: var(--card); color: var(--text); font-size: 0.9rem; }
+.admin-input { padding: 8px 10px; border: 2px solid var(--text-dim); border-radius: var(--radius); background: var(--card); color: var(--text); font-size: 0.9rem; width: 80px; }
+.admin-input-num { width: 60px; }
+.admin-section { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--text-dim); }
+.admin-section h4 { font-size: 0.95rem; margin: 0 0 8px 0; color: var(--text); }
+.btn-admin-action { padding: 8px 14px; background: var(--accent-fisher); border: none; border-radius: var(--radius); color: #1a1b26; font-family: var(--font-title); font-size: 0.85rem; cursor: pointer; transition: transform 0.15s; }
+.btn-admin-action:hover { transform: scale(1.05); }
+.btn-admin-action:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-admin-refresh { padding: 6px 10px; background: var(--card); border: 2px solid var(--text-dim); border-radius: var(--radius); color: var(--text); font-size: 0.8rem; cursor: pointer; }
+.admin-hint { font-size: 0.8rem; color: var(--text-dim); margin: 4px 0 0 0; }
+.admin-result { margin-top: 12px; padding: 10px; background: var(--bg-soft); border-radius: 8px; font-size: 0.9rem; color: var(--accent-farmer); min-height: 1.2em; }
+.admin-result.admin-result-err { color: #f7768e; }
