@@ -1,4 +1,4 @@
-const { handleGameCommand, getState } = require('./game/gameEngine');
+const { handleGameCommand, getState, schedulePersist } = require('./game/gameEngine');
 const plazaGamble = require('./game/plazaGamble');
 const { getNickname } = require('./game/gameEngine');
 
@@ -57,12 +57,14 @@ function apiCommand(req, res, body, onAfter) {
     adminResult: result.adminResult || null
   };
   if (typeof onAfter === 'function') onAfter(result);
+  if (result.state && schedulePersist) schedulePersist();
   res.end(JSON.stringify(payload));
 }
 
 function apiGetState(req, res) {
   const sid = getOrCreateSessionId(req);
   const state = getState(sid);
+  if (state && schedulePersist) schedulePersist();
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.end(JSON.stringify({ state }));
 }

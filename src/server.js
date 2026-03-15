@@ -1,8 +1,11 @@
-const http = require('http');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+const http = require('http');
 const fs = require('fs');
 const WebSocket = require('ws');
+const db = require('./db');
 const { apiCommand, apiGetState, apiPlazaRound, apiLogout } = require('./webApi');
+const { initUsers } = require('./game/gameEngine');
 const { attachChat } = require('./chatServer');
 const plazaGamble = require('./game/plazaGamble');
 const { addGoldToUser, getNickname } = require('./game/gameEngine');
@@ -85,6 +88,12 @@ plazaGamble.setOnRoundResolved((completed) => {
 });
 plazaGamble.startRoundScheduler(getNickname, addGoldToUser);
 
-server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+async function start() {
+  const useMongo = !!(process.env.MONGODB_URI && process.env.MONGODB_URI.includes('mongodb'));
+  if (useMongo) await db.connect();
+  await initUsers(useMongo);
+  server.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+  });
+}
+start().catch((e) => { console.error(e); process.exit(1); });

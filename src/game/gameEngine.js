@@ -1,16 +1,60 @@
 /**
  * 낚시광 모티브 — 단순 성장형 낚시 게임
  * 루프: 낚시 → 물고기 드랍 → 가방/판매 → 골드로 강화 → 더 좋은 드랍
- * 전투: 먹이사슬, 전투능력 1-50, 강화석, 하루 3회
  */
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const plazaGamble = require('./plazaGamble');
-const battleSystem = require('./battleSystem');
 const users = new Map();
 
-const COMBAT_POWER_MAX = 20;
-const BATTLES_PER_DAY = 3;
-const FOOD_CHAIN_CRIT_RATE = battleSystem.FOOD_CHAIN_CRIT_RATE;
+// 계정 자동 저장 (data/users.json)
+const DATA_DIR = path.join(process.cwd(), 'data');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+let saveTimeout = null;
+
+function loadUsersFromFile() {
+  try {
+    if (!fs.existsSync(USERS_FILE)) return;
+    const raw = fs.readFileSync(USERS_FILE, 'utf8');
+    const data = JSON.parse(raw);
+    const list = data.users || [];
+    users.clear();
+    list.forEach((u) => {
+      if (u.id && u.id !== 'admin') users.set(u.id, u);
+    });
+  } catch (e) {
+    console.warn('계정 파일 로드 실패:', e.message);
+  }
+}
+
+function saveUsersToFile() {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    const list = Array.from(users.entries())
+      .filter(([id]) => id !== 'admin')
+      .map(([, u]) => u);
+    fs.writeFileSync(USERS_FILE, JSON.stringify({ users: list }, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('계정 파일 저장 실패:', e.message);
+  }
+}
+
+let useMongo = false;
+
+function schedulePersist() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(doPersist, 800);
+}
+
+function doPersist() {
+  if (useMongo) {
+    const db = require('../db');
+    db.saveAllUsers(users).catch(() => {});
+  } else {
+    saveUsersToFile();
+  }
+}
 
 // 직업별 레어/일반 아이템 ID 목록 (조합용)
 const FARM_RARE = ['crop_rare1', 'crop_rare2', 'crop_unique'];
@@ -167,32 +211,14 @@ const LOTTO_BOX_REWARDS = [
 const CONSUMABLE_ITEMS = {
   energy_drink: { name: '에너지드링크', gold: 0, rarity: 'consumable', sellable: false, useValue: 30 },
   super_food: { name: '슈퍼푸드', gold: 0, rarity: 'consumable', sellable: false, useValue: 50 },
-  job_contract: { name: '이직계약서', gold: 0, rarity: 'special', sellable: false },
-  enhancement_stone: { name: '강화석', gold: 0, rarity: 'special', sellable: false },
-  enhancement_stone_fragment: { name: '강화석 조각', gold: 0, rarity: 'special', sellable: false },
-  advanced_enhancement_stone: { name: '고급강화석', gold: 0, rarity: 'special', sellable: false }
+  job_contract: { name: '이직계약서', gold: 0, rarity: 'special', sellable: false }
 };
 
-// 고급 드랍 아이템 ID (레어+유니크) - 고급강화석 조합용
-const RARE_ITEM_IDS = [...FARM_RARE, ...FISH_RARE, ...MINER_RARE];
-
-// 크로스 직업 조합: [농부레어5+어부일반10]=슈퍼푸드, [어부레어5+농부일반10]=이직계약서, [광부레어5+어부일반10]=강화석조각
+// 크로스 직업 조합: [농부레어5+어부일반10]=슈퍼푸드, [어부레어5+농부일반10]=이직계약서
 const CROSS_CRAFT_RECIPES = {
   super_food: { rareIds: ['crop_rare1', 'crop_rare2', 'crop_unique'], normalIds: ['fish_1', 'fish_2', 'fish_3', 'fish_4', 'fish_5'], rareCount: 5, normalCount: 10 },
-  job_contract: { rareIds: ['fish_rare1', 'fish_rare2', 'fish_unique'], normalIds: ['crop_1', 'crop_2', 'crop_3', 'crop_4', 'crop_5'], rareCount: 5, normalCount: 10 },
-  enhancement_stone_fragment: { rareIds: ['ore_rare1', 'ore_rare2', 'ore_unique'], normalIds: ['fish_1', 'fish_2', 'fish_3', 'fish_4', 'fish_5'], rareCount: 5, normalCount: 10 }
+  job_contract: { rareIds: ['fish_rare1', 'fish_rare2', 'fish_unique'], normalIds: ['crop_1', 'crop_2', 'crop_3', 'crop_4', 'crop_5'], rareCount: 5, normalCount: 10 }
 };
-
-// 전투능력 강화 확률: 1~20단계. 1단계 60%, 1~10 강화석 / 11~20 고급강화석만, 20단계 극악
-function getEnhanceProb(currentLevel) {
-  if (currentLevel >= COMBAT_POWER_MAX) return 0;
-  if (currentLevel <= 10) {
-    return Math.max(0.15, 0.6 - (currentLevel - 1) * 0.05); // 1:60%, 2:55%, ... 10:15%
-  }
-  const advLevel = currentLevel - 10;
-  const probs = [0.10, 0.05, 0.025, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.00001];
-  return probs[Math.min(advLevel - 1, 9)] || 0.00001;
-}
 
 const ITEMS = {};
 Object.entries(FISH).forEach(([id, f]) => {
@@ -284,9 +310,6 @@ function createAccount(accountId, password) {
     energy: ENERGY_MAX,
     maxEnergy: ENERGY_MAX,
     lastResetDate: getKSTDateString(),
-    combatPower: 1,
-    battlesToday: 0,
-    battleHistory: [],
     inventory: {}
   };
   users.set(id, user);
@@ -363,9 +386,6 @@ function getOrCreateUser(userId) {
   if (!users.has(userId)) return null;
   const u = users.get(userId);
   if (u.harvestCount == null) u.harvestCount = 0;
-  if (u.combatPower == null) u.combatPower = 1;
-  if (u.battlesToday == null) u.battlesToday = 0;
-  if (u.battleHistory == null) u.battleHistory = [];
   if (u.mineCount == null) u.mineCount = 0;
   if (u.jobTitleFarmer == null) u.jobTitleFarmer = 0;
   if (u.jobTitleFisherman == null) u.jobTitleFisherman = 0;
@@ -386,9 +406,6 @@ function getOrCreateUser(userId) {
 function _ensureUserFields(u) {
   if (!u) return;
   if (u.harvestCount == null) u.harvestCount = 0;
-  if (u.combatPower == null) u.combatPower = 1;
-  if (u.battlesToday == null) u.battlesToday = 0;
-  if (u.battleHistory == null) u.battleHistory = [];
   if (u.mineCount == null) u.mineCount = 0;
   if (u.jobTitleFarmer == null) u.jobTitleFarmer = 0;
   if (u.jobTitleFisherman == null) u.jobTitleFisherman = 0;
@@ -433,9 +450,6 @@ function getOrCreateUser_OLD(userId) {
   }
   const u = users.get(userId);
   if (u.harvestCount == null) u.harvestCount = 0;
-  if (u.combatPower == null) u.combatPower = 1;
-  if (u.battlesToday == null) u.battlesToday = 0;
-  if (u.battleHistory == null) u.battleHistory = [];
   if (u.mineCount == null) u.mineCount = 0;
   if (u.jobTitleFarmer == null) u.jobTitleFarmer = 0;
   if (u.jobTitleFisherman == null) u.jobTitleFisherman = 0;
@@ -460,7 +474,6 @@ function ensureDailyEnergy(user) {
     user.energy = user.maxEnergy;
     user.lottoBoxBoughtToday = 0;
     user.narakBoxBoughtToday = 0;
-    user.battlesToday = 0;
   }
 }
 
@@ -587,9 +600,6 @@ function buildState(user) {
     nextTitleRequirement: nextReq,
     lottoBoxRemaining: Math.max(0, 5 - (user.lottoBoxBoughtToday || 0)),
     narakBoxRemaining: user.narakBoxBoughtToday ? 0 : 1,
-    combatPower: user.combatPower || 1,
-    battlesRemaining: Math.max(0, BATTLES_PER_DAY - (user.battlesToday || 0)),
-    battleHistory: (user.battleHistory || []).slice(0, 50),
     inventory: { ...user.inventory },
     inventoryList: list,
     guildPoolList,
@@ -649,7 +659,7 @@ function handleGameCommand(userId, body) {
       if (!target) return { replyText: '대상 계정을 찾을 수 없습니다.', state: buildState(user) };
       const itemId = String(body.itemId || '').trim();
       const count = parseInt(body.count, 10) || 1;
-      if (!itemId || !ITEMS[itemId]) return { replyText: '유효한 itemId를 입력하세요. (예: contract_1, fish_1, crop_rare1, enhancement_stone 등)', state: buildState(user) };
+      if (!itemId || !ITEMS[itemId]) return { replyText: '유효한 itemId를 입력하세요. (예: contract_1, fish_1, crop_rare1 등)', state: buildState(user) };
       if (count < 1) return { replyText: '추가 개수는 1 이상이어야 합니다.', state: buildState(user) };
       addToInv(target.inventory, itemId, count);
       const it = ITEMS[itemId];
@@ -1126,96 +1136,15 @@ function handleGameCommand(userId, body) {
     };
   }
 
-  // 전투: 하루 3회, 다른 직업 랜덤 매칭, 골드±10%, 무승부 에너지-10
-  if (cmd === '전투' || cmd === 'battle') {
-    const battlesDone = user.battlesToday || 0;
-    if (battlesDone >= BATTLES_PER_DAY) {
-      return { replyText: `오늘 전투 기회를 모두 사용했습니다. (${BATTLES_PER_DAY}회/일)`, state: buildState(user), quickReplies: [], battle: null };
-    }
-    const opponent = battleSystem.findOpponent(users, userId, user.characterType);
-    if (!opponent) {
-      return { replyText: '전투할 상대가 없습니다. (다른 직업 유저 필요)', state: buildState(user), quickReplies: [], battle: null };
-    }
-    const def = opponent.user;
-    const outcome = battleSystem.resolveBattle(user, def, user.characterType, def.characterType, userId, opponent.id);
-    user.battlesToday = battlesDone + 1;
-    let goldChange = 0;
-    let energyChange = 0;
-    if (outcome.result === 'win') {
-      goldChange = Math.floor((def.gold || 0) * 0.1);
-      user.gold = (user.gold || 0) + goldChange;
-      def.gold = Math.max(0, (def.gold || 0) - goldChange);
-    } else if (outcome.result === 'lose') {
-      goldChange = -Math.floor((user.gold || 0) * 0.1);
-      user.gold = Math.max(0, (user.gold || 0) + goldChange);
-      def.gold = (def.gold || 0) + (-goldChange);
-    } else {
-      energyChange = -10;
-      user.energy = Math.max(0, (user.energy || 0) + energyChange);
-    }
-    const entry = { result: outcome.result, reason: outcome.reason, vs: def.characterName, vsJob: def.characterType, goldChange, energyChange, at: Date.now() };
-    (user.battleHistory || []).unshift(entry);
-    if (user.battleHistory.length > 50) user.battleHistory.pop();
-    return {
-      replyText: '',
-      state: buildState(user),
-      battle: { ...entry, opponentName: def.characterName, opponentJob: def.characterType },
-      quickReplies: []
-    };
-  }
-
-  // 전투능력 강화: 1~10 강화석, 11~20 고급강화석만 (최대 20)
-  if (cmd === '전투능력강화' || cmd === 'enhanceCombat') {
-    const cur = user.combatPower || 1;
-    if (cur >= COMBAT_POWER_MAX) {
-      return { replyText: '전투능력이 이미 최대(20)입니다.', state: buildState(user), quickReplies: [], combatEnhance: null };
-    }
-    const needAdvanced = cur >= 11;
-    if (needAdvanced) {
-      const advStones = user.inventory['advanced_enhancement_stone'] || 0;
-      if (advStones < 1) {
-        return { replyText: '11단계부터는 고급강화석이 필요합니다. (강화석 1 + 레어/유니크 아이템 5개 → 고급강화석 조합)', state: buildState(user), quickReplies: [], combatEnhance: null };
-      }
-      addToInv(user.inventory, 'advanced_enhancement_stone', -1);
-      if (!user.inventory['advanced_enhancement_stone']) delete user.inventory['advanced_enhancement_stone'];
-    } else {
-      const stones = user.inventory['enhancement_stone'] || 0;
-      if (stones < 1) {
-        return { replyText: '강화석이 없습니다. (강화석 조각 10개 → 강화석 조합)', state: buildState(user), quickReplies: [], combatEnhance: null };
-      }
-      addToInv(user.inventory, 'enhancement_stone', -1);
-      if (!user.inventory['enhancement_stone']) delete user.inventory['enhancement_stone'];
-    }
-    const prob = getEnhanceProb(cur);
-    const success = Math.random() < prob;
-    if (success) {
-      user.combatPower = cur + 1;
-      return { replyText: `전투능력 강화 성공! ${cur} → ${user.combatPower}단계`, state: buildState(user), combatEnhance: { success: true, from: cur, to: user.combatPower }, quickReplies: [] };
-    }
-    return { replyText: `강화 실패... (${cur}단계 유지, 성공확률 ${(prob * 100).toFixed(2)}%)`, state: buildState(user), combatEnhance: { success: false, from: cur }, quickReplies: [] };
-  }
-
-  // 고급강화석 조합: 강화석 1 + 레어/유니크 아이템 5개
-  if (cmd === '고급강화석조합' || cmd === 'craftAdvancedEnhancementStone') {
-    const stone = user.inventory['enhancement_stone'] || 0;
-    if (stone < 1) return { replyText: '강화석 1개가 필요합니다.', state: buildState(user), quickReplies: [] };
-    const rareTotal = RARE_ITEM_IDS.reduce((s, id) => s + (user.inventory[id] || 0), 0);
-    if (rareTotal < 5) return { replyText: `레어/유니크 아이템 5개 필요 (보유 ${rareTotal}개)`, state: buildState(user), quickReplies: [] };
-    addToInv(user.inventory, 'enhancement_stone', -1);
-    if (!user.inventory['enhancement_stone']) delete user.inventory['enhancement_stone'];
-    let left = 5;
-    for (const id of RARE_ITEM_IDS) {
-      if (left <= 0) break;
-      const have = user.inventory[id] || 0;
-      const take = Math.min(have, left);
-      if (take > 0) {
-        addToInv(user.inventory, id, -take);
-        if (!user.inventory[id]) delete user.inventory[id];
-        left -= take;
-      }
-    }
-    addToInv(user.inventory, 'advanced_enhancement_stone', 1);
-    return { replyText: '고급강화석 조합 완료!', state: buildState(user), quickReplies: [] };
+  // 슈퍼푸드 사용 (에너지 +50)
+  if (cmd === '슈퍼푸드사용' || cmd === 'useSuperFood') {
+    const have = user.inventory['super_food'] || 0;
+    if (have < 1) return { replyText: '슈퍼푸드가 없습니다.', state: buildState(user), quickReplies: [] };
+    addToInv(user.inventory, 'super_food', -1);
+    if (!user.inventory['super_food']) delete user.inventory['super_food'];
+    const gain = CONSUMABLE_ITEMS.super_food.useValue || 50;
+    user.energy = Math.min((user.energy || 0) + gain, user.maxEnergy || ENERGY_MAX);
+    return { replyText: `슈퍼푸드 사용! 에너지 +${gain}`, state: buildState(user), useSuperFood: { gained: gain }, quickReplies: [] };
   }
 
   // 슈퍼푸드 사용 (에너지 +50)
@@ -1229,12 +1158,12 @@ function handleGameCommand(userId, body) {
     return { replyText: `슈퍼푸드 사용! 에너지 +${gain}`, state: buildState(user), useSuperFood: { gained: gain }, quickReplies: [] };
   }
 
-  // 크로스 조합: 슈퍼푸드, 이직계약서, 강화석조각
+  // 크로스 조합: 슈퍼푸드, 이직계약서
   if (cmd === '크로스조합' || cmd === 'crossCraft') {
     const targetId = (isObject && body.craftTarget) ? String(body.craftTarget) : '';
     const recipe = CROSS_CRAFT_RECIPES[targetId];
     if (!recipe) {
-      return { replyText: '조합 대상을 선택하세요. (슈퍼푸드 / 이직계약서 / 강화석조각)', state: buildState(user), quickReplies: [] };
+      return { replyText: '조합 대상을 선택하세요. (슈퍼푸드 / 이직계약서)', state: buildState(user), quickReplies: [] };
     }
     const rareSum = recipe.rareIds.reduce((s, id) => s + (user.inventory[id] || 0), 0);
     const normalSum = recipe.normalIds.reduce((s, id) => s + (user.inventory[id] || 0), 0);
@@ -1248,123 +1177,6 @@ function handleGameCommand(userId, body) {
     addToInv(user.inventory, targetId, 1);
     const toName = CONSUMABLE_ITEMS[targetId]?.name || ITEMS[targetId]?.name || targetId;
     return { replyText: `${toName} 조합 완료!`, state: buildState(user), craftCross: { to: targetId, toName }, quickReplies: [] };
-  }
-
-  // 강화석 조각 10개 → 강화석
-  if (cmd === '강화석조합' || cmd === 'craftEnhancementStone') {
-    const have = user.inventory['enhancement_stone_fragment'] || 0;
-    if (have < 10) return { replyText: `강화석 조각 10개 필요 (보유 ${have}개)`, state: buildState(user), quickReplies: [] };
-    addToInv(user.inventory, 'enhancement_stone_fragment', -10);
-    if (!user.inventory['enhancement_stone_fragment']) delete user.inventory['enhancement_stone_fragment'];
-    addToInv(user.inventory, 'enhancement_stone', 1);
-    return { replyText: '강화석 조합 완료!', state: buildState(user), craftEnhancementStone: true, quickReplies: [] };
-  }
-
-  // 고급강화석 조합: 강화석 1 + 고급드랍(레어/유니크) 5개
-  if (cmd === '고급강화석조합' || cmd === 'craftAdvancedEnhancementStone') {
-    const stone = user.inventory['enhancement_stone'] || 0;
-    if (stone < 1) return { replyText: '강화석 1개가 필요합니다.', state: buildState(user), quickReplies: [] };
-    const rareTotal = RARE_ITEM_IDS.reduce((s, id) => s + (user.inventory[id] || 0), 0);
-    if (rareTotal < 5) return { replyText: `고급 드랍(레어/유니크) 5개 필요 (보유 ${rareTotal}개)`, state: buildState(user), quickReplies: [] };
-    addToInv(user.inventory, 'enhancement_stone', -1);
-    if (!user.inventory['enhancement_stone']) delete user.inventory['enhancement_stone'];
-    let left = 5;
-    for (const id of RARE_ITEM_IDS) {
-      if (left <= 0) break;
-      const n = Math.min(user.inventory[id] || 0, left);
-      if (n > 0) {
-        addToInv(user.inventory, id, -n);
-        if (!user.inventory[id]) delete user.inventory[id];
-        left -= n;
-      }
-    }
-    addToInv(user.inventory, 'advanced_enhancement_stone', 1);
-    return { replyText: '고급강화석 조합 완료!', state: buildState(user), craftAdvancedEnhancementStone: true, quickReplies: [] };
-  }
-
-  // 전투 (하루 3회, 다른 직업 유저와 랜덤 매칭)
-  if (cmd === '전투' || cmd === 'battle') {
-    const battlesDone = user.battlesToday || 0;
-    if (battlesDone >= BATTLES_PER_DAY) {
-      return { replyText: '오늘 전투 가능 횟수를 모두 사용했습니다.', state: buildState(user), quickReplies: [], battle: null };
-    }
-    const opponent = battleSystem.findOpponent(users, userId, user.characterType);
-    if (!opponent) {
-      return { replyText: '매칭 가능한 상대가 없습니다.', state: buildState(user), quickReplies: [], battle: null };
-    }
-    const battleResult = battleSystem.resolveBattle(user, opponent.user, user.characterType, opponent.user.characterType, userId, opponent.id);
-    user.battlesToday = battlesDone + 1;
-
-    const myGold = user.gold || 0;
-    const oppGold = opponent.user.gold || 0;
-    const stealPct = 0.1;
-    let goldChange = 0;
-    let energyChange = 0;
-
-    if (battleResult.result === 'win') {
-      goldChange = Math.floor(oppGold * stealPct);
-      if (goldChange > 0) {
-        opponent.user.gold = Math.max(0, oppGold - goldChange);
-        user.gold = myGold + goldChange;
-      }
-    } else if (battleResult.result === 'lose') {
-      goldChange = -Math.floor(myGold * stealPct);
-      user.gold = Math.max(0, myGold + goldChange);
-    } else {
-      energyChange = -10;
-      user.energy = Math.max(0, (user.energy || 0) + energyChange);
-    }
-
-    const record = {
-      result: battleResult.result,
-      reason: battleResult.reason,
-      opponentName: opponent.user.characterName || '???',
-      opponentJob: opponent.user.characterType,
-      goldChange,
-      energyChange,
-      at: Date.now()
-    };
-    (user.battleHistory || []).unshift(record);
-    if (user.battleHistory.length > 50) user.battleHistory.pop();
-
-    return {
-      replyText: '',
-      state: buildState(user),
-      quickReplies: [],
-      battle: { ...record, opponentJobLabel: JOB_LABELS[opponent.user.characterType] }
-    };
-  }
-
-  // 전투능력 강화 (강화석 1개 소진, 확률 성공)
-  if (cmd === '전투능력강화' || cmd === 'enhanceCombat') {
-    const stones = user.inventory['enhancement_stone'] || 0;
-    if (stones < 1) {
-      return { replyText: '강화석이 없습니다.', state: buildState(user), quickReplies: [], enhanceCombat: null };
-    }
-    const cp = user.combatPower || 1;
-    if (cp >= COMBAT_POWER_MAX) {
-      return { replyText: '이미 전투능력 최대입니다.', state: buildState(user), quickReplies: [], enhanceCombat: null };
-    }
-    addToInv(user.inventory, 'enhancement_stone', -1);
-    if (!user.inventory['enhancement_stone']) delete user.inventory['enhancement_stone'];
-
-    const prob = getEnhanceProb(cp);
-    const success = Math.random() < prob;
-    if (success) {
-      user.combatPower = cp + 1;
-      return {
-        replyText: `전투능력 강화 성공! ${cp} → ${user.combatPower}단계`,
-        state: buildState(user),
-        quickReplies: [],
-        enhanceCombat: { success: true, newLevel: user.combatPower }
-      };
-    }
-    return {
-      replyText: '강화 실패... 강화석만 소모되었습니다.',
-      state: buildState(user),
-      quickReplies: [],
-      enhanceCombat: { success: false }
-    };
   }
 
   // 슈퍼푸드 사용 (에너지 +50)
@@ -1385,13 +1197,13 @@ function handleGameCommand(userId, body) {
     };
   }
 
-  // 크로스 직업 조합 (슈퍼푸드/이직계약서/강화석조각)
+  // 크로스 직업 조합 (슈퍼푸드/이직계약서)
   if (cmd === '크로스조합' || cmd === 'craftCross') {
     const targetId = (isObject && body.craftTarget) ? String(body.craftTarget) : '';
     const recipe = CROSS_CRAFT_RECIPES[targetId];
     if (!recipe) {
       return {
-        replyText: '조합할 아이템을 선택하세요. (슈퍼푸드/이직계약서/강화석조각)',
+        replyText: '조합할 아이템을 선택하세요. (슈퍼푸드/이직계약서)',
         state: buildState(user),
         quickReplies: []
       };
@@ -1433,115 +1245,6 @@ function handleGameCommand(userId, body) {
     };
   }
 
-  // 강화석 조각 10개 → 강화석
-  if (cmd === '강화석조합' || cmd === 'craftEnhancementStone') {
-    const frags = user.inventory['enhancement_stone_fragment'] || 0;
-    if (frags < 10) {
-      return {
-        replyText: `강화석 조각 10개 필요 (보유 ${frags}개)`,
-        state: buildState(user),
-        quickReplies: []
-      };
-    }
-    addToInv(user.inventory, 'enhancement_stone_fragment', -10);
-    if (!user.inventory['enhancement_stone_fragment']) delete user.inventory['enhancement_stone_fragment'];
-    addToInv(user.inventory, 'enhancement_stone', 1);
-    return {
-      replyText: '강화석 조각 10개 → 강화석 1개 조합 완료!',
-      state: buildState(user),
-      craftEnhancementStone: true,
-      quickReplies: []
-    };
-  }
-
-  // 전투 (하루 3회, 다른 직업 유저와 랜덤 매칭)
-  if (cmd === '전투' || cmd === 'battle') {
-    const used = user.battlesToday || 0;
-    if (used >= BATTLES_PER_DAY) {
-      return { replyText: `오늘 전투 기회를 모두 사용했습니다. (${BATTLES_PER_DAY}회/일)`, state: buildState(user), quickReplies: [] };
-    }
-    const opp = battleSystem.findOpponent(users, userId, user.characterType);
-    if (!opp) {
-      return { replyText: '전투할 상대를 찾을 수 없습니다. (다른 직업 유저가 없음)', state: buildState(user), quickReplies: [], battle: null };
-    }
-    const defender = opp.user;
-    const battleResult = battleSystem.resolveBattle(user, defender, user.characterType, defender.characterType, userId, opp.id);
-    user.battlesToday = used + 1;
-    const historyEntry = {
-      opponentName: defender.characterName,
-      opponentJob: defender.characterType,
-      result: battleResult.result,
-      reason: battleResult.reason,
-      goldChange: 0,
-      energyChange: 0,
-      at: Date.now()
-    };
-    if (battleResult.result === 'win') {
-      const gain = Math.floor((defender.gold || 0) * 0.1);
-      if (gain > 0) {
-        defender.gold = Math.max(0, (defender.gold || 0) - gain);
-        user.gold = (user.gold || 0) + gain;
-        historyEntry.goldChange = gain;
-      }
-    } else if (battleResult.result === 'lose') {
-      const loss = Math.floor((user.gold || 0) * 0.1);
-      if (loss > 0) {
-        user.gold = Math.max(0, (user.gold || 0) - loss);
-        defender.gold = (defender.gold || 0) + loss;
-        historyEntry.goldChange = -loss;
-      }
-    } else {
-      user.energy = Math.max(0, (user.energy || 0) - 10);
-      historyEntry.energyChange = -10;
-    }
-    (user.battleHistory = user.battleHistory || []).unshift(historyEntry);
-    if (user.battleHistory.length > 50) user.battleHistory.pop();
-    return {
-      replyText: '',
-      state: buildState(user),
-      quickReplies: [],
-      battle: {
-        result: battleResult.result,
-        reason: battleResult.reason,
-        opponentName: defender.characterName,
-        opponentJob: defender.characterType,
-        goldChange: historyEntry.goldChange,
-        energyChange: historyEntry.energyChange
-      }
-    };
-  }
-
-  // 전투능력 강화 (강화석 1개 소모, 확률성)
-  if (cmd === '전투능력강화' || cmd === 'enhanceCombat') {
-    const cur = user.combatPower || 1;
-    if (cur >= COMBAT_POWER_MAX) {
-      return { replyText: '전투능력이 이미 최대(20)입니다.', state: buildState(user), quickReplies: [], enhanceCombat: null };
-    }
-    const stones = user.inventory['enhancement_stone'] || 0;
-    if (stones < 1) {
-      return { replyText: '강화석이 없습니다. (강화석 조각 10개 조합 → 강화석)', state: buildState(user), quickReplies: [], enhanceCombat: null };
-    }
-    user.inventory['enhancement_stone'] = stones - 1;
-    if (!user.inventory['enhancement_stone']) delete user.inventory['enhancement_stone'];
-    const prob = getEnhanceProb(cur);
-    const success = Math.random() < prob;
-    if (success) {
-      user.combatPower = cur + 1;
-      return {
-        replyText: `전투능력 강화 성공! ${cur} → ${cur + 1}단계`,
-        state: buildState(user),
-        quickReplies: [],
-        enhanceCombat: { success: true, from: cur, to: cur + 1 }
-      };
-    }
-    return {
-      replyText: `강화 실패... (${cur}단계 유지, 성공확률 ${(prob * 100).toFixed(1)}%)`,
-      state: buildState(user),
-      quickReplies: [],
-      enhanceCombat: { success: false, from: cur, to: cur }
-    };
-  }
-
   // 슈퍼푸드 사용 (에너지 +50)
   if (cmd === '슈퍼푸드사용' || cmd === 'useSuperFood') {
     const have = user.inventory['super_food'] || 0;
@@ -1566,7 +1269,7 @@ function handleGameCommand(userId, body) {
     const recipe = CROSS_CRAFT_RECIPES[targetId];
     if (!recipe) {
       return {
-        replyText: '조합할 아이템을 선택하세요. (super_food / job_contract / enhancement_stone_fragment)',
+        replyText: '조합할 아이템을 선택하세요. (super_food / job_contract)',
         state: buildState(user),
         quickReplies: []
       };
@@ -1611,112 +1314,6 @@ function handleGameCommand(userId, body) {
     };
   }
 
-  // 강화석 조각 10개 → 강화석 1개
-  if (cmd === '강화석조합' || cmd === 'craftEnhancementStone') {
-    const frags = user.inventory['enhancement_stone_fragment'] || 0;
-    if (frags < 10) {
-      return {
-        replyText: `강화석 조각이 부족합니다. (10개 필요, 보유 ${frags}개)`,
-        state: buildState(user),
-        quickReplies: []
-      };
-    }
-    user.inventory['enhancement_stone_fragment'] = frags - 10;
-    if (!user.inventory['enhancement_stone_fragment']) delete user.inventory['enhancement_stone_fragment'];
-    addToInv(user.inventory, 'enhancement_stone', 1);
-    return {
-      replyText: '강화석 조각 10개 → 강화석 1개 조합 완료!',
-      state: buildState(user),
-      craftEnhancementStone: { fragmentsUsed: 10 },
-      quickReplies: []
-    };
-  }
-
-  // 전투 (하루 3회, 다른 직업 랜덤 매칭)
-  if (cmd === '전투' || cmd === 'battle') {
-    const battlesDone = user.battlesToday || 0;
-    if (battlesDone >= BATTLES_PER_DAY) {
-      return { replyText: '오늘 전투 횟수를 모두 사용했습니다. (3회/일)', state: buildState(user), quickReplies: [], battle: null };
-    }
-    const opp = battleSystem.findOpponent(users, userId, user.characterType);
-    if (!opp) {
-      return { replyText: '전투할 상대를 찾을 수 없습니다. (다른 직업 유저 필요)', state: buildState(user), quickReplies: [], battle: null };
-    }
-    const defender = opp.user;
-    const outcome = battleSystem.resolveBattle(user, defender, user.characterType, defender.characterType, userId, opp.id);
-    user.battlesToday = battlesDone + 1;
-    const myGold = user.gold || 0;
-    const oppGold = defender.gold || 0;
-    let goldChange = 0;
-    let energyChange = 0;
-    if (outcome.result === 'win') {
-      goldChange = Math.min(Math.floor(oppGold * 0.1), oppGold);
-      if (goldChange > 0 && opp.id) {
-        const def = users.get(opp.id);
-        if (def) def.gold = Math.max(0, (def.gold || 0) - goldChange);
-      }
-      user.gold = myGold + goldChange;
-    } else if (outcome.result === 'lose') {
-      goldChange = -Math.min(Math.floor(myGold * 0.1), myGold);
-      user.gold = Math.max(0, myGold + goldChange);
-      if (goldChange < 0 && opp.id) {
-        const def = users.get(opp.id);
-        if (def) def.gold = (def.gold || 0) + Math.abs(goldChange);
-      }
-    } else {
-      energyChange = -10;
-      user.energy = Math.max(0, (user.energy || 0) + energyChange);
-    }
-    const record = {
-      result: outcome.result,
-      vsName: defender.characterName || '???',
-      vsJob: JOB_LABELS[defender.characterType] || defender.characterType,
-      goldChange,
-      energyChange,
-      reason: outcome.reason,
-      at: Date.now()
-    };
-    (user.battleHistory || []).unshift(record);
-    if (user.battleHistory.length > 50) user.battleHistory.pop();
-    return {
-      replyText: '',
-      state: buildState(user),
-      battle: record,
-      quickReplies: []
-    };
-  }
-
-  // 전투능력 강화 (강화석 1개 소모)
-  if (cmd === '전투능력강화' || cmd === 'enhanceCombat') {
-    const cur = user.combatPower || 1;
-    if (cur >= COMBAT_POWER_MAX) {
-      return { replyText: '전투능력이 이미 최대(20)입니다.', state: buildState(user), quickReplies: [], enhanceCombat: null };
-    }
-    const stones = user.inventory['enhancement_stone'] || 0;
-    if (stones < 1) {
-      return { replyText: '강화석이 없습니다. (강화석 조각 10개 조합)', state: buildState(user), quickReplies: [], enhanceCombat: null };
-    }
-    const prob = getEnhanceProb(cur);
-    const success = Math.random() < prob;
-    addToInv(user.inventory, 'enhancement_stone', -1);
-    if (!user.inventory['enhancement_stone']) delete user.inventory['enhancement_stone'];
-    if (success) {
-      user.combatPower = cur + 1;
-      return {
-        replyText: `전투능력 강화 성공! ${cur} → ${cur + 1}`,
-        state: buildState(user),
-        enhanceCombat: { success: true, from: cur, to: cur + 1 },
-        quickReplies: []
-      };
-    }
-    return {
-      replyText: `전투능력 강화 실패! (${cur}단계 유지)`,
-      state: buildState(user),
-      enhanceCombat: { success: false, level: cur },
-      quickReplies: []
-    };
-  }
-
   // 슈퍼푸드 사용 (에너지 +50)
   if (cmd === '슈퍼푸드사용' || cmd === 'useSuperFood') {
     const have = user.inventory['super_food'] || 0;
@@ -1741,7 +1338,7 @@ function handleGameCommand(userId, body) {
     const recipe = CROSS_CRAFT_RECIPES[targetId];
     if (!recipe) {
       return {
-        replyText: '조합할 아이템을 선택하세요. (super_food / job_contract / enhancement_stone_fragment)',
+        replyText: '조합할 아이템을 선택하세요. (super_food / job_contract)',
         state: buildState(user),
         quickReplies: []
       };
@@ -1807,27 +1404,6 @@ function handleGameCommand(userId, body) {
     };
   }
 
-  // 강화석 조각 10개 → 강화석
-  if (cmd === '강화석조합' || cmd === 'craftEnhancementStone') {
-    const have = user.inventory['enhancement_stone_fragment'] || 0;
-    if (have < 10) {
-      return {
-        replyText: `강화석 조합 실패. 강화석 조각 10개 필요 (보유 ${have}개)`,
-        state: buildState(user),
-        quickReplies: []
-      };
-    }
-    addToInv(user.inventory, 'enhancement_stone_fragment', -10);
-    if (!user.inventory['enhancement_stone_fragment']) delete user.inventory['enhancement_stone_fragment'];
-    addToInv(user.inventory, 'enhancement_stone', 1);
-    return {
-      replyText: '강화석 조각 10개 → 강화석 1개 조합 완료!',
-      state: buildState(user),
-      craftEnhancementStone: { from: 10, to: 1 },
-      quickReplies: []
-    };
-  }
-
   return {
     replyText: '알 수 없는 명령입니다.',
     state: buildState(user),
@@ -1881,13 +1457,22 @@ function initAdminAccount() {
     energy: ENERGY_MAX,
     maxEnergy: ENERGY_MAX,
     lastResetDate: getKSTDateString(),
-    combatPower: 1,
-    battlesToday: 0,
-    battleHistory: [],
     inventory: {}
   };
   users.set(ADMIN_ID, user);
 }
-initAdminAccount();
 
-module.exports = { handleGameCommand, getState, addGoldToUser, getNickname, users, FISH, JOBS, JOB_LABELS };
+async function initUsers(fromMongo) {
+  useMongo = !!fromMongo;
+  if (fromMongo) {
+    const db = require('../db');
+    const list = await db.loadAllUsers();
+    users.clear();
+    list.forEach((u) => { if (u.id && u.id !== 'admin') users.set(u.id, u); });
+  } else {
+    loadUsersFromFile();
+  }
+  initAdminAccount();
+}
+
+module.exports = { handleGameCommand, getState, addGoldToUser, getNickname, users, schedulePersist, initUsers, FISH, JOBS, JOB_LABELS };

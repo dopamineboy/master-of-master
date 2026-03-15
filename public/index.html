@@ -227,16 +227,6 @@
         </div>
       </div>
 
-      <!-- 전투 결과/버튼 (채널 하단 가운데) -->
-      <div class="battle-section" id="battle-section">
-        <div class="battle-header">
-          <button type="button" id="btn-battle" class="btn-battle">⚔️ 전투</button>
-          <span class="battle-remaining" id="battle-remaining">3/3</span>
-        </div>
-        <div class="battle-result-list" id="battle-result-list">
-          <p class="battle-empty" id="battle-empty">전투 이력이 없습니다.</p>
-        </div>
-      </div>
       <!-- 로그아웃 (맨 하단 가운데) -->
       <div class="channel-logout-wrap">
         <button type="button" id="btn-logout" class="icon-btn btn-logout-bottom" title="로그아웃 (Ctrl+Shift+L)">
@@ -244,17 +234,6 @@
           <span class="icon-btn-label">로그아웃</span>
         </button>
       </div>
-      <!-- 전투 결과 오버레이 (승/패/무) -->
-      <div id="battle-result-overlay" class="battle-result-overlay hidden" aria-live="polite">
-        <div class="battle-showdown">
-          <span class="battle-vs-left">나</span>
-          <span class="battle-vs-vs">VS</span>
-          <span id="battle-opponent-name" class="battle-vs-right">???</span>
-        </div>
-        <div id="battle-result-text" class="battle-result-text"></div>
-        <div id="battle-result-detail" class="battle-result-detail"></div>
-      </div>
-
       <!-- 채팅 패널 (오른쪽 슬라이드) -->
       <aside id="panel-chat" class="panel panel-chat">
         <div class="panel-chat-inner">
@@ -280,7 +259,6 @@
           </div>
           <div class="myinfo-body">
             <div class="myinfo-row"><span class="myinfo-label">아이디</span><span id="myinfo-account" class="myinfo-value">-</span></div>
-            <div class="myinfo-row"><span class="myinfo-label">전투능력</span><span id="myinfo-combat" class="myinfo-value">1</span></div>
             <div class="myinfo-row"><span class="myinfo-label">칭호</span><span id="myinfo-title" class="myinfo-value">평민</span></div>
             <div class="myinfo-row"><span class="myinfo-label">보유 골드</span><span id="myinfo-gold" class="myinfo-value">0</span> G</div>
             <div id="myinfo-activity-row" class="myinfo-row myinfo-activity-row hidden"><span class="myinfo-label">활동 횟수</span><span id="myinfo-activity" class="myinfo-value"></span></div>
@@ -325,18 +303,6 @@
           <div id="welcome-title" class="welcome-title">축하합니다!</div>
           <div id="welcome-icon" class="welcome-icon">🎉</div>
           <div id="welcome-sub" class="welcome-sub"></div>
-        </div>
-      </div>
-      <!-- 전투 결과 오버레이 -->
-      <div id="battle-result-overlay" class="battle-result-overlay hidden" aria-live="polite">
-        <div class="battle-result-inner">
-          <div class="battle-vs-wrap">
-            <span class="battle-vs-me">나</span>
-            <span class="battle-vs-vs">⚔️ VS</span>
-            <span class="battle-vs-opp" id="battle-opponent-name">???</span>
-          </div>
-          <div id="battle-result-text" class="battle-result-text"></div>
-          <div id="battle-result-detail" class="battle-result-detail"></div>
         </div>
       </div>
       <!-- 로또상자 오픈 결과 모달 -->

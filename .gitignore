@@ -26,3 +26,6 @@ dist/
 tmp/
 temp/
 *.tmp
+
+# 게임 계정 데이터 (로컬 저장)
+data/

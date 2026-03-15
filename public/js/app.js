@@ -26,10 +26,9 @@
         '<p><strong>4. 가방</strong><br>탭별 아이템 확인, 전부 판매 가능.</p>' +
         '<p><strong>5. 장터</strong><br>일반판매 / 상인조합(농부·어부·광부 판매→장사꾼 구매) / 상인판매(장사꾼 등록·모두 구매).</p>' +
         '<p><strong>6. 광장</strong><br>철수 vs 영희 배팅(30~100G, 30분마다). 2배·6배 배당.</p>' +
-        '<p><strong>7. 전투</strong><br>하루 3회, 먹이사슬 적용. 승/패 시 골드±10%, 무승부 에너지-10.</p>' +
-        '<p><strong>8. 강화·조합</strong><br>전투능력 강화(강화석), 계약서 조합(10→1), 크로스조합(레어+일반).</p>' +
-        '<p><strong>9. 팁</strong><br>에너지는 자정 리셋. 장사꾼은 상인조합→재판매. 레어·유니크는 크로스조합 재료.</p>' +
-        '<p><strong>10. 문제</strong><br>버튼 비활성→에너지 2 이상. 전투 불가→3회 제한. 칭호→계약서 확인.</p>' +
+        '<p><strong>7. 강화·조합</strong><br>계약서 조합(10→1), 크로스조합(레어+일반).</p>' +
+        '<p><strong>8. 팁</strong><br>에너지는 자정 리셋. 장사꾼은 상인조합→재판매. 레어·유니크는 크로스조합 재료.</p>' +
+        '<p><strong>9. 문제</strong><br>버튼 비활성→에너지 2 이상. 칭호→계약서 확인.</p>' +
         '</div>'
     },
     { title: '채널에 오신 걸 환영합니다', body: '각 구역을 눌러 이동할 수 있습니다.' }
@@ -77,7 +76,6 @@
   const btnLogout = document.getElementById('btn-logout');
   const panelMyinfo = document.getElementById('panel-myinfo');
   const panelBag = document.getElementById('panel-bag');
-  const myinfoCombat = document.getElementById('myinfo-combat');
   const myinfoTitle = document.getElementById('myinfo-title');
   const myinfoGold = document.getElementById('myinfo-gold');
   const myinfoAccount = document.getElementById('myinfo-account');
@@ -166,7 +164,6 @@
       if (data && data.state) {
         channelState = data.state;
         updateEnergyGauge(channelState);
-        updateBattleUI(channelState);
         updateAdminVisibility();
       }
     });
@@ -175,36 +172,6 @@
     var btnAdmin = document.getElementById('btn-admin');
     if (btnAdmin) {
       btnAdmin.classList.toggle('hidden', !(channelState && channelState.isAdmin));
-    }
-  }
-
-  function updateBattleUI(s) {
-    var rem = document.getElementById('battle-remaining');
-    var list = document.getElementById('battle-result-list');
-    var empty = document.getElementById('battle-empty');
-    if (!s) return;
-    var battlesRem = s.battlesRemaining != null ? s.battlesRemaining : 3;
-    var total = 3;
-    if (rem) rem.textContent = battlesRem + '/' + total;
-    var history = s.battleHistory || [];
-    if (list) {
-      if (history.length === 0) {
-        if (empty) empty.classList.remove('hidden');
-        list.querySelectorAll('.battle-result-item').forEach(function (el) { el.remove(); });
-      } else {
-        if (empty) empty.classList.add('hidden');
-        var existing = list.querySelectorAll('.battle-result-item');
-        if (existing.length !== history.length) {
-          list.querySelectorAll('.battle-result-item').forEach(function (el) { el.remove(); });
-          history.forEach(function (h) {
-            var div = document.createElement('div');
-            div.className = 'battle-result-item battle-' + (h.result || 'draw');
-            var icon = h.result === 'win' ? '🟢' : h.result === 'lose' ? '🔴' : '🟡';
-            div.innerHTML = icon + ' vs ' + (h.opponentName || '???') + ' ' + (h.result === 'win' ? '승리' : h.result === 'lose' ? '패배' : '무승부');
-            list.insertBefore(div, list.firstChild);
-          });
-        }
-      }
     }
   }
 
@@ -225,9 +192,7 @@
         updateEnergyGauge(channelState);
       }
       if (channelState) {
-        updateBattleUI(channelState);
         if (myinfoAccount) myinfoAccount.textContent = channelState.accountId || '-';
-        if (myinfoCombat) myinfoCombat.textContent = channelState.combatPower != null ? channelState.combatPower : 1;
         myinfoTitle.textContent = channelState.title || '평민';
         myinfoGold.textContent = channelState.gold != null ? channelState.gold : 0;
         var jobType = channelState.characterType;
@@ -304,8 +269,6 @@
               actionBtn = '<button type="button" class="btn-bag-action btn-use-energy" data-action="에너지드링크사용"><span class="btn-energy-icon">⚡</span> 사용</button>';
             } else if (it.id === 'super_food') {
               actionBtn = '<button type="button" class="btn-bag-action" data-action="슈퍼푸드사용"><span>🍖</span> 사용</button>';
-            } else if (it.id === 'enhancement_stone' || it.id === 'advanced_enhancement_stone') {
-              actionBtn = '<button type="button" class="btn-bag-action" data-action="전투능력강화"><span>💎</span> 강화</button>';
             }
             html += '<li><span>' + it.name + ' x' + it.count + '</span>' + goldSpan + (actionBtn ? ' ' + actionBtn : '') + '</li>';
           });
@@ -325,16 +288,10 @@
         html += '<div class="bag-craft-section"><div class="bag-job-title">크로스 조합</div><div class="bag-craft-list">';
         [
           { targetId: 'super_food', label: '슈퍼푸드 (농부레어5+어부일반10)' },
-          { targetId: 'job_contract', label: '이직계약서 (어부레어5+농부일반10)' },
-          { targetId: 'enhancement_stone_fragment', label: '강화석조각 (광부레어5+어부일반10)' }
+          { targetId: 'job_contract', label: '이직계약서 (어부레어5+농부일반10)' }
         ].forEach(function (r) {
           html += '<div class="bag-craft-item"><span>' + r.label + '</span><button type="button" class="btn-craft btn-cross-craft" data-craft-target="' + r.targetId + '">조합</button></div>';
         });
-        html += '</div></div>';
-        var frags = inv['enhancement_stone_fragment'] || 0;
-        html += '<div class="bag-craft-section"><div class="bag-job-title">강화석 조합</div><div class="bag-craft-list">';
-        html += '<div class="bag-craft-item"><span>강화석 조각 10개 → 강화석 1개</span><span class="craft-have">(보유 ' + frags + '개)</span>';
-        html += (frags >= 10 ? '<button type="button" class="btn-craft btn-enhance-stone" data-action="강화석조합">조합</button>' : '<button type="button" class="btn-craft" disabled>조합</button>');
         html += '</div></div></div>';
         bagContent.innerHTML = html || '<p class="bag-empty">아이템이 없습니다.</p>';
         bagContent.querySelectorAll('.btn-craft:not([disabled])').forEach(function (btn) {
@@ -342,15 +299,13 @@
             var target = btn.getAttribute('data-target');
             var craftTarget = btn.getAttribute('data-craft-target');
             var action = btn.getAttribute('data-action');
-            var apiAction = target ? '계약서조합' : (craftTarget ? '크로스조합' : (action || ''));
-            var body = target ? { action: '계약서조합', targetId: target } : (craftTarget ? { action: '크로스조합', craftTarget: craftTarget } : { action: action || '강화석조합' });
-            if (!apiAction && action) body = { action: '강화석조합' };
+            var apiAction = target ? '계약서조합' : (craftTarget ? '크로스조합' : action);
+            var body = target ? { action: '계약서조합', targetId: target } : (craftTarget ? { action: '크로스조합', craftTarget: craftTarget } : (action ? { action: action } : {}));
             api('POST', '/api/command', body)
               .then(function (res) {
                 if (res.state) {
                   channelState = res.state;
                   updateEnergyGauge(res.state);
-                  updateBattleUI(res.state);
                 }
                 openBag();
               });
@@ -365,7 +320,6 @@
                 if (res.state) {
                   channelState = res.state;
                   updateEnergyGauge(res.state);
-                  updateBattleUI(res.state);
                 }
                 if (action === '로또상자열기' && res.lottoOpen) {
                   showLottoResultOverlay(res.lottoOpen, openBag);
@@ -561,7 +515,6 @@
             showChannelScreen(res.state.characterType || 'farmer', displayName, false);
             channelState = res.state;
             updateEnergyGauge(channelState);
-            updateBattleUI(channelState);
           } else {
             if (loginError) { loginError.textContent = res.replyText || res.error || '로그인에 실패했습니다.'; loginError.classList.remove('hidden'); }
           }
@@ -740,83 +693,6 @@
 
   btnMyinfo.addEventListener('click', openMyinfo);
   btnBag.addEventListener('click', openBag);
-  function showBattleResultOverlay(battle) {
-    var overlay = document.getElementById('battle-result-overlay');
-    var resultText = document.getElementById('battle-result-text');
-    var detailEl = document.getElementById('battle-result-detail');
-    var oppEl = document.getElementById('battle-opponent-name');
-    if (!overlay || !resultText) return;
-    var r = battle.result || 'draw';
-    if (r === 'none') {
-      resultText.textContent = battle.reason || '전투 불가';
-      resultText.className = 'battle-result-text battle-result-none';
-      if (detailEl) detailEl.textContent = '';
-      if (oppEl) oppEl.textContent = '-';
-    } else {
-      var labels = { win: '승리!', lose: '패배...', draw: '무승부' };
-      var icons = { win: '🟢', lose: '🔴', draw: '🟡' };
-      resultText.textContent = (icons[r] || '') + ' ' + (labels[r] || r);
-      resultText.className = 'battle-result-text battle-result-' + r;
-      if (oppEl) oppEl.textContent = battle.opponentName || battle.opponentJobLabel || '???';
-      var parts = [];
-      if (battle.goldChange != null) {
-        if (battle.goldChange > 0) parts.push('+' + battle.goldChange + ' G 획득');
-        else if (battle.goldChange < 0) parts.push(battle.goldChange + ' G 잃음');
-      }
-      if (battle.energyChange != null && battle.energyChange !== 0) {
-        parts.push('에너지 ' + (battle.energyChange > 0 ? '+' : '') + battle.energyChange);
-      }
-      if (battle.reason) parts.push(battle.reason);
-      if (detailEl) detailEl.textContent = parts.join(' · ');
-    }
-    overlay.classList.remove('hidden');
-    overlay.classList.add('battle-result-visible');
-    setTimeout(function () {
-      overlay.classList.remove('battle-result-visible');
-      setTimeout(function () { overlay.classList.add('hidden'); }, 400);
-    }, 2800);
-  }
-  var btnBattle = document.getElementById('btn-battle');
-  if (btnBattle) {
-    btnBattle.addEventListener('click', function () {
-      if (btnBattle.disabled) return;
-      var rem = document.getElementById('battle-remaining');
-      if (rem && rem.textContent === '0/3') return;
-      btnBattle.disabled = true;
-      btnBattle.classList.add('battle-loading');
-      api('POST', '/api/command', { action: '전투' })
-        .then(function (res) {
-          btnBattle.classList.remove('battle-loading');
-          if (res.state) {
-            channelState = res.state;
-            updateEnergyGauge(res.state);
-            updateBattleUI(res.state);
-          }
-          btnBattle.disabled = (channelState && channelState.battlesRemaining != null && channelState.battlesRemaining <= 0);
-          if (res.battle) {
-            showBattleResultOverlay(res.battle);
-          } else if (res.replyText) {
-            var msg = res.replyText;
-            if (msg.indexOf('모두 사용') !== -1 || msg.indexOf('상대') !== -1 || msg.indexOf('매칭') !== -1) {
-              showBattleResultOverlay({ result: 'none', reason: msg });
-            } else {
-              var list = document.getElementById('battle-result-list');
-              if (list) {
-                var msgEl = document.createElement('div');
-                msgEl.className = 'battle-result-msg';
-                msgEl.textContent = msg;
-                list.insertBefore(msgEl, list.firstChild);
-                setTimeout(function () { if (msgEl.parentNode) msgEl.remove(); }, 3000);
-              }
-            }
-          }
-        })
-        .catch(function () {
-          btnBattle.disabled = false;
-          btnBattle.classList.remove('battle-loading');
-        });
-    });
-  }
   btnChat.addEventListener('click', function () { openPanel(panelChat); });
   btnNotice.addEventListener('click', function () { openPanel(panelNotice); });
 
